@@ -78,20 +78,30 @@ pygra
 ### Command-line interface
 
 ```bash
+# open GUI with no files
 pygra
-pygra --file base.dat --file unique.dat
-pygra --file plot_*.dat
-pygra --file base.dat --x 0 --y 3 --file unique.dat --x 0 --y 5
-pygra --file base.dat --file unique.dat --x 0 --y 3
+
+# positional arguments — shell expands the glob
+pygra *file*.dat --x 0 --y 5
+
+# same columns for all files
+pygra file1.dat file2.dat --x 0 --y 3
+
+# per-file column specification (using --file)
+pygra --file file1.dat --x 0 --y 3 --file file2.dat --x 0 --y 5
+
+# load a saved session
 pygra --load session.json
+
+# help
 pygra --help
 ```
 
 **CLI rules:**
-- `--x` / `--y` immediately after `--file` apply to that file only
-- `--x` / `--y` after all `--file` arguments apply to all files
-- Default: x=0, y=1
-- Glob patterns are expanded by the shell automatically
+- Files can be passed as positional arguments: `pygra *.dat` works as expected
+- `--x` / `--y` immediately after `--file` apply to that specific file only
+- `--x` / `--y` after all files apply to all of them
+- Default columns: x=0, y=1
 
 ## File format
 

@@ -9,26 +9,36 @@ HELP_TEXT = """
 PyGRA — interactive scientific data plotter
 
 Usage:
-  pygra [options]
+  pygra [file ...] [options]
+  pygra --file FILE [--x COL] [--y COL] [--file FILE ...] [options]
+
+Positional arguments:
+  file                  One or more data files. The shell expands glob
+                        patterns, e.g.:  pygra *wham_TI.dat
 
 Options:
-  -f, --file FILE       Load a data file (repeatable). The shell expands
-                        glob patterns, e.g. --file plot_*.dat
+  -f, --file FILE       Load a data file (repeatable, alternative to positional)
   --x COL               x column index (0-based) for the preceding --file.
-                        If given after all --file arguments, applies to all.
-                        Default: 0
+                        If given after all files, applies to all. Default: 0
   --y COL               y column index (0-based) for the preceding --file.
-                        If given after all --file arguments, applies to all.
-                        Default: 1
+                        If given after all files, applies to all. Default: 1
   -l, --load FILE       Load a previously saved session (.json)
   -h, --help            Show this help message and exit
 
 Examples:
+  # open GUI with no files
   pygra
-  pygra --file base.dat --file unique.dat
-  pygra --file plot_*.dat
+
+  # positional — shell expands the glob
+  pygra *wham_TI.dat
+
+  # same columns for all files
+  pygra base.dat unique.dat --x 0 --y 3
+
+  # per-file column specification
   pygra --file base.dat --x 0 --y 3 --file unique.dat --x 0 --y 5
-  pygra --file base.dat --file unique.dat --x 0 --y 3
+
+  # load a saved session
   pygra --load session.json
 """
 
@@ -41,7 +51,7 @@ def _parse_interleaved(argv: list) -> dict:
     files = []
     load  = None
 
-    # First pass: collect files and any immediately following --x/--y
+    # First pass: collect files (from --file or positional) and any immediately following --x/--y
     i = 0
     while i < len(argv):
         tok = argv[i]
@@ -60,14 +70,15 @@ def _parse_interleaved(argv: list) -> dict:
             i += 1
             try:    files[-1]["ycol"] = int(argv[i])
             except: pass
+        elif not tok.startswith("-"):
+            # positional argument: treat as a file path
+            files.append({"path": tok, "xcol": None, "ycol": None})
         i += 1
 
     # Second pass: fill in defaults and propagate shared values
-    # Find the first explicitly set xcol/ycol (if any)
     explicit_x = next((f["xcol"] for f in files if f["xcol"] is not None), None)
     explicit_y = next((f["ycol"] for f in files if f["ycol"] is not None), None)
 
-    # If only some files have explicit values, propagate to those without
     for f in files:
         if f["xcol"] is None:
             f["xcol"] = explicit_x if explicit_x is not None else 0
