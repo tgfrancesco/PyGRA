@@ -34,7 +34,7 @@ conda env create -f environment.yml
 conda activate pygra
 ```
 
-Or install into an existing environment (e.g. your oxDNA environment):
+Or install into an existing environment:
 
 ```bash
 conda activate oxdna
