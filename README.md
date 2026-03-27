@@ -6,7 +6,7 @@
 
 **PyGRA** is an interactive scientific data plotter built with Python, PyQt5, and matplotlib, inspired by xmgrace.
 
-Works on **macOS**, **Linux**, and **Windows**. On macOS the menu bar appears in the system bar at the top of the screen.
+Works on **macOS**, **Linux**, and **Windows**.	
 
 ## Features
 
