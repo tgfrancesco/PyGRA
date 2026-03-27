@@ -2,11 +2,13 @@
 
 <p align="center">
   <img src="logo/pygra_logo.png" width="340" alt="PyGRA logo — a sleepy sloth on a graph"/>
+  <br>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+  <img src="https://img.shields.io/badge/python-3.11+-yellow" alt="Python Version">
 </p>
-![Platform: macOS | Windows | Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
-**PyGRA** is an interactive scientific data plotter built with Python, PyQt5, and matplotlib, inspired by xmgrace.
+**PyGRA** is an interactive scientific data plotter built with Python, PyQt5, and Matplotlib, inspired by *xmgrace*.
 
 ## Features
 
