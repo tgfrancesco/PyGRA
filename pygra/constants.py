@@ -49,4 +49,9 @@ DEFAULT_STYLE_SETTINGS = {
     "grid_minor": False,
     "theme":      "default",
     "dpi":        150,
+    "legend_loc":          "best",
+    "legend_frameon":      True,
+    "legend_alpha":        1.0,
+    "legend_ncols":        1,
+    "legend_handlelength": 2.0,
 }

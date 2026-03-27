@@ -98,6 +98,8 @@ class MainWindow(QMainWindow):
         self.dataset_widgets: list = []
         self.fit_layers:      list = []       # list of FitLayer
         self.style_settings = dict(DEFAULT_STYLE_SETTINGS)
+        self._legend_pos = None   # (x, y) in axes fraction coords, None = use loc setting
+        self._dragging_legend = False
         self._build_ui()
         self._build_menu()
 
@@ -109,10 +111,12 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
 
         file_menu = mb.addMenu("File")
-        self._act(file_menu, "Load session...",   "Ctrl+L", self._load_state)
+        self._act(file_menu, "Load session...",    "Ctrl+L", self._load_state)
         file_menu.addSeparator()
-        self._act(file_menu, "Save session...",   "Ctrl+S", self._save_state)
-        self._act(file_menu, "Export active data...", None, self._export_active)
+        self._act(file_menu, "Save session...",    "Ctrl+S", self._save_state)
+        self._act(file_menu, "Save figure...",     "Ctrl+E", self._save_figure)
+        file_menu.addSeparator()
+        self._act(file_menu, "Export active data...", None,  self._export_active)
 
         analysis_menu = mb.addMenu("Analysis")
         self._act(analysis_menu, "Transform data...",        "Ctrl+T", self._transform_active)
@@ -227,9 +231,20 @@ class MainWindow(QMainWindow):
         rv.addLayout(tb_row)
         rv.addWidget(self.canvas)
 
+        self._reset_leg_btn = QPushButton("↺ Legend")
+        self._reset_leg_btn.setFixedHeight(28)
+        self._reset_leg_btn.setToolTip("Reset legend to automatic position")
+        self._reset_leg_btn.clicked.connect(self._reset_legend_pos)
+        tb_row.insertWidget(3, self._reset_leg_btn)
+
         self._zoom_btn.toggled.connect(self._toggle_zoom)
         self._pan_btn.toggled.connect(self._toggle_pan)
         self._home_btn.clicked.connect(self._home)
+
+        # legend drag events
+        self.canvas.mpl_connect("button_press_event",   self._on_mouse_press)
+        self.canvas.mpl_connect("motion_notify_event",  self._on_mouse_move)
+        self.canvas.mpl_connect("button_release_event", self._on_mouse_release)
 
         splitter.addWidget(right)
         splitter.setStretchFactor(1, 1)
@@ -259,6 +274,47 @@ class MainWindow(QMainWindow):
         self._zoom_btn.setChecked(False)
         self._pan_btn.setChecked(False)
         self._nav.home()
+
+    def _reset_legend_pos(self):
+        """Reset legend to automatic positioning."""
+        self._legend_pos = None
+        self._plot()
+
+    # ------------------------------------------------------------------
+    # Legend drag
+    # ------------------------------------------------------------------
+
+    def _on_mouse_press(self, event):
+        if self._zoom_btn.isChecked() or self._pan_btn.isChecked():
+            return
+        ax = self.fig.axes[0] if self.fig.axes else None
+        if ax is None:
+            return
+        leg = ax.get_legend()
+        if leg and leg.contains(event)[0]:
+            self._dragging_legend = True
+
+    def _on_mouse_move(self, event):
+        if not self._dragging_legend:
+            return
+        ax = self.fig.axes[0] if self.fig.axes else None
+        if ax is None:
+            return
+        # convert display (pixel) coords to axes fraction via transform
+        try:
+            inv = ax.transAxes.inverted()
+            fx, fy = inv.transform((event.x, event.y))
+        except Exception:
+            return
+        self._legend_pos = (fx, fy)
+        leg = ax.get_legend()
+        if leg:
+            leg.set_bbox_to_anchor((fx, fy), transform=ax.transAxes)
+            leg._loc = 6
+            self.canvas.draw_idle()
+
+    def _on_mouse_release(self, event):
+        self._dragging_legend = False
 
     # ------------------------------------------------------------------
     # File actions
@@ -741,8 +797,24 @@ class MainWindow(QMainWindow):
         if ss["grid_major"]: ax.grid(True, which="major", alpha=0.35)
         if ss["grid_minor"]: ax.grid(True, which="minor", alpha=0.15, linestyle=":")
 
-        if any(dw.get_config()["label"] for dw in self.dataset_widgets) or self.fit_layers:
-            ax.legend(fontsize=ss["legend_fs"])
+        has_legend = (any(dw.get_config()["label"] for dw in self.dataset_widgets)
+                      or self.fit_layers)
+        if has_legend:
+            leg_kw = dict(
+                fontsize=ss["legend_fs"],
+                frameon=ss.get("legend_frameon", True),
+                ncols=ss.get("legend_ncols", 1),
+                handlelength=ss.get("legend_handlelength", 2.0),
+            )
+            alpha = ss.get("legend_alpha", 1.0)
+            leg = ax.legend(loc=ss.get("legend_loc", "best"), **leg_kw)
+            if leg:
+                leg.get_frame().set_alpha(alpha)
+                # restore dragged position after legend is created
+                if self._legend_pos is not None:
+                    leg.set_bbox_to_anchor(self._legend_pos, transform=ax.transAxes)
+                    leg._loc = 6  # "center left" as anchor reference
+                self._current_legend = leg
 
         self.canvas.draw()
 

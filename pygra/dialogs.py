@@ -94,6 +94,35 @@ class StyleDialog(QDialog):
         self.dpi = QSpinBox(); self.dpi.setRange(72, 600); self.dpi.setValue(s.get("dpi", 150))
         form.addRow("Save DPI:", self.dpi)
 
+        self._sep(form)
+
+        # legend options
+        LEGEND_LOCS = ["best", "upper right", "upper left", "lower left",
+                       "lower right", "right", "center left", "center right",
+                       "lower center", "upper center", "center"]
+        self.legend_loc = QComboBox()
+        self.legend_loc.addItems(LEGEND_LOCS)
+        self.legend_loc.setCurrentText(s.get("legend_loc", "best"))
+        form.addRow("Legend position:", self.legend_loc)
+
+        self.legend_frameon = QCheckBox()
+        self.legend_frameon.setChecked(s.get("legend_frameon", True))
+        form.addRow("Legend frame:", self.legend_frameon)
+
+        self.legend_alpha = QDoubleSpinBox()
+        self.legend_alpha.setRange(0.0, 1.0); self.legend_alpha.setSingleStep(0.1)
+        self.legend_alpha.setValue(s.get("legend_alpha", 1.0))
+        form.addRow("Legend background alpha (0=transparent):", self.legend_alpha)
+
+        self.legend_ncols = QSpinBox()
+        self.legend_ncols.setRange(1, 10); self.legend_ncols.setValue(s.get("legend_ncols", 1))
+        form.addRow("Legend columns:", self.legend_ncols)
+
+        self.legend_handlelength = QDoubleSpinBox()
+        self.legend_handlelength.setRange(0.5, 10.0); self.legend_handlelength.setSingleStep(0.5)
+        self.legend_handlelength.setValue(s.get("legend_handlelength", 2.0))
+        form.addRow("Legend symbol size:", self.legend_handlelength)
+
         layout.addLayout(form)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self.accept)
@@ -116,8 +145,13 @@ class StyleDialog(QDialog):
             "minor_y":    self.minor_y.value(),
             "grid_major": self.grid_major.isChecked(),
             "grid_minor": self.grid_minor.isChecked(),
-            "theme":      self.theme.currentText(),
-            "dpi":        self.dpi.value(),
+            "theme":           self.theme.currentText(),
+            "dpi":             self.dpi.value(),
+            "legend_loc":      self.legend_loc.currentText(),
+            "legend_frameon":  self.legend_frameon.isChecked(),
+            "legend_alpha":    self.legend_alpha.value(),
+            "legend_ncols":    self.legend_ncols.value(),
+            "legend_handlelength": self.legend_handlelength.value(),
         }
 
 
