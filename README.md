@@ -180,6 +180,16 @@ PyGRA/
 - matplotlib >= 3.7
 - PyQt5 >= 5.15
 
+## Development
+
+Install `pytest` and run the test suite from the project root:
+
+```bash
+pytest tests/ -q
+```
+
+Tests cover `DataSet` loading, all `apply_transform` operations, and all fitting functions. They import only `numpy`, `scipy`, and `pygra` — no display or PyQt5 required, so they run in headless CI environments.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
