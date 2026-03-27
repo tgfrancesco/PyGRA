@@ -30,6 +30,7 @@ from .dialogs import (
 from .fitting import FIT_FUNCTIONS, fit_custom
 from .widgets import DatasetWidget
 from .state import save_state, load_state
+from .preferences import load_prefs, save_prefs, PREFS_PATH
 
 
 class FitLayer:
@@ -97,11 +98,14 @@ class MainWindow(QMainWindow):
         self.datasets:        list = []
         self.dataset_widgets: list = []
         self.fit_layers:      list = []       # list of FitLayer
-        self.style_settings = dict(DEFAULT_STYLE_SETTINGS)
-        self._legend_pos = None   # (x, y) in axes fraction coords, None = use loc setting
+        self._prefs = load_prefs()
+        self.style_settings = {k: self._prefs.get(k, v)
+                               for k, v in DEFAULT_STYLE_SETTINGS.items()}
+        self._legend_pos = None
         self._dragging_legend = False
         self._build_ui()
         self._build_menu()
+        self._restore_geometry()
 
     # ------------------------------------------------------------------
     # Menu bar
@@ -127,6 +131,9 @@ class MainWindow(QMainWindow):
 
         view_menu = mb.addMenu("View")
         self._act(view_menu, "Style settings...", "Ctrl+,", self._open_style)
+        view_menu.addSeparator()
+        self._act(view_menu, "Save preferences",  None,     self._save_preferences)
+        self._act(view_menu, "Reset preferences", None,     self._reset_preferences)
 
         # plot shortcut (also triggered by the Plot button)
         from PyQt5.QtWidgets import QShortcut
@@ -150,7 +157,8 @@ class MainWindow(QMainWindow):
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
 
-        splitter = QSplitter(Qt.Horizontal)
+        self._splitter = QSplitter(Qt.Horizontal)
+        splitter = self._splitter
         root.addWidget(splitter)
 
         # ---- LEFT PANEL ----
@@ -279,6 +287,61 @@ class MainWindow(QMainWindow):
         """Reset legend to automatic positioning."""
         self._legend_pos = None
         self._plot()
+
+    # ------------------------------------------------------------------
+    # Geometry / preferences
+    # ------------------------------------------------------------------
+
+    def _restore_geometry(self):
+        p = self._prefs
+        self.move(p.get("window_x", 100), p.get("window_y", 100))
+        self.resize(p.get("window_w", 1200), p.get("window_h", 760))
+        sp = p.get("splitter_pos", 330)
+        total = self._splitter.width() or (p.get("window_w", 1200))
+        self._splitter.setSizes([sp, max(1, total - sp)])
+
+    def _collect_geometry(self) -> dict:
+        geo  = self.geometry()
+        sizes = self._splitter.sizes()
+        return {
+            "window_x":   geo.x(),
+            "window_y":   geo.y(),
+            "window_w":   geo.width(),
+            "window_h":   geo.height(),
+            "splitter_pos": sizes[0] if sizes else 330,
+        }
+
+    def _save_preferences(self):
+        """Save current geometry + style settings as user preferences."""
+        prefs = dict(self._prefs)
+        prefs.update(self._collect_geometry())
+        prefs.update(self.style_settings)
+        # preserve custom colors
+        prefs["custom_colors"] = self._prefs.get("custom_colors", [])
+        save_prefs(prefs)
+        self._prefs = prefs
+        from PyQt5.QtWidgets import QMessageBox
+        QMessageBox.information(self, "Preferences saved",
+                                f"Preferences saved to:\n{PREFS_PATH}")
+
+    def _reset_preferences(self):
+        from PyQt5.QtWidgets import QMessageBox
+        from .preferences import DEFAULT_PREFS
+        reply = QMessageBox.question(self, "Reset preferences",
+                                     "Reset all preferences to defaults?",
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            save_prefs(dict(DEFAULT_PREFS))
+            self._prefs = dict(DEFAULT_PREFS)
+            QMessageBox.information(self, "Done",
+                                    "Preferences reset. Restart PyGRA to apply.")
+
+    def closeEvent(self, event):
+        """Auto-save geometry on close."""
+        prefs = dict(self._prefs)
+        prefs.update(self._collect_geometry())
+        save_prefs(prefs)
+        super().closeEvent(event)
 
     # ------------------------------------------------------------------
     # Legend drag
@@ -551,10 +614,9 @@ class MainWindow(QMainWindow):
 
     def _edit_fit_layer(self, layer: FitLayer, widget: "FitLayerWidget"):
         """Open appearance dialog for a fit layer on double-click."""
-        from PyQt5.QtWidgets import (QDialog, QColorDialog, QDialogButtonBox,
+        from PyQt5.QtWidgets import (QDialog, QDialogButtonBox,
                                      QFormLayout, QVBoxLayout, QLineEdit,
                                      QPushButton, QComboBox, QDoubleSpinBox)
-        from PyQt5.QtGui import QColor
         from .constants import LINESTYLES, LINESTYLE_LABELS
 
         dlg = QDialog(self)
@@ -584,9 +646,10 @@ class MainWindow(QMainWindow):
             f"border-radius: 4px; padding: 4px 8px;"
         )
         def pick_color():
-            c = QColorDialog.getColor(QColor(_color[0]), dlg)
-            if c.isValid():
-                _color[0] = c.name()
+            from .dialogs import pick_color as _pick
+            new_c = _pick(_color[0], dlg)
+            if new_c != _color[0]:
+                _color[0] = new_c
                 color_btn.setText(_color[0])
                 color_btn.setStyleSheet(
                     f"background-color: {_color[0]}; border: 1px solid #888; "

@@ -17,6 +17,51 @@ from .constants import (
     LINESTYLES, LINESTYLE_LABELS, MARKERS, MARKER_LABELS,
 )
 
+
+def pick_color(current: str, parent=None) -> str:
+    """
+    Open a QColorDialog pre-loaded with saved custom colors.
+    Returns new hex color string, or current if cancelled.
+    Saves chosen custom colors back to preferences.
+    """
+    from PyQt5.QtGui import QColor
+    try:
+        from .preferences import load_prefs, save_prefs
+        prefs = load_prefs()
+        custom = prefs.get("custom_colors", [])
+    except Exception:
+        custom = []
+
+    # populate QColorDialog custom color slots (max 16)
+    for i, hex_c in enumerate(custom[:16]):
+        try:
+            QColorDialog.setCustomColor(i, QColor(hex_c))
+        except Exception:
+            pass
+
+    c = QColorDialog.getColor(QColor(current), parent,
+                              options=QColorDialog.DontUseNativeDialog)
+    if not c.isValid():
+        return current
+
+    # collect custom colors back from dialog
+    new_custom = []
+    for i in range(16):
+        try:
+            cc = QColorDialog.customColor(i)
+            if cc.isValid() and cc.name() != "#000000":
+                new_custom.append(cc.name())
+        except Exception:
+            pass
+
+    try:
+        prefs["custom_colors"] = list(dict.fromkeys(new_custom))[:16]
+        save_prefs(prefs)
+    except Exception:
+        pass
+
+    return c.name()
+
 # All fit/interpolation methods in one list
 FIT_METHODS = [
     "spline",
@@ -298,13 +343,13 @@ class AppearanceDialog(QDialog):
 
     def _pick(self, target):
         current = self._color if target == "line" else self._face_color
-        c = QColorDialog.getColor(QColor(current), self)
-        if c.isValid():
+        new_color = pick_color(current, self)
+        if new_color != current:
             if target == "line":
-                self._color = c.name()
+                self._color = new_color
                 self._refresh_btn(self.color_btn, self._color)
             else:
-                self._face_color = c.name()
+                self._face_color = new_color
                 self._refresh_btn(self.face_btn, self._face_color)
 
     def get_config(self) -> dict:
@@ -380,13 +425,13 @@ class HistAppearanceDialog(QDialog):
 
     def _pick(self, target):
         current = self._color if target == "fill" else self._face_color
-        c = QColorDialog.getColor(QColor(current), self)
-        if c.isValid():
+        new_color = pick_color(current, self)
+        if new_color != current:
             if target == "fill":
-                self._color = c.name()
+                self._color = new_color
                 self._refresh_btn(self.fill_btn, self._color)
             else:
-                self._face_color = c.name()
+                self._face_color = new_color
                 self._refresh_btn(self.edge_btn, self._face_color)
 
     def get_config(self) -> dict:
@@ -478,9 +523,9 @@ class FitDialog(QDialog):
         btn.setText(color)
 
     def _pick_color(self):
-        c = QColorDialog.getColor(QColor(self._color), self)
-        if c.isValid():
-            self._color = c.name()
+        new_color = pick_color(self._color, self)
+        if new_color != self._color:
+            self._color = new_color
             self._refresh_btn(self.color_btn, self._color)
 
     def get_config(self) -> dict:
