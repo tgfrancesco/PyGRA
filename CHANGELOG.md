@@ -2,13 +2,19 @@
 
 ## [0.5.1] - 2026-03-27
 
-### Added
-- 79 pytest tests covering `DataSet` loading, all `apply_transform` operations, and all fit functions (`tests/test_dataset.py`, `tests/test_fitting.py`)
+- 83 pytest tests covering `DataSet` loading, all `apply_transform` operations, all fit functions, and CLI parser behavior (`tests/test_dataset.py`, `tests/test_fitting.py`, `tests/test_cli.py`)
 
 ### Fixed
-- Dataset loading now shows a warning dialog listing skipped row count, line numbers, and content instead of silently discarding malformed rows
-- `fit_custom`: math functions (e.g. `exp`, `sin`) no longer overwrite numpy ufuncs in the formula namespace; array formulas now work correctly
-- Replaced bare `except:` and `except Exception: pass` blocks across `main.py`, `dialogs.py`, `mainwindow.py`, `palettes.py`, and `preferences.py` with specific exception types and stderr warnings so failures are visible
+- Dataset loading now shows a warning dialog listing skipped row count, line
+  numbers, and content instead of silently discarding malformed rows
+- `fit_custom`: math functions (e.g. `exp`, `sin`) no longer overwrite numpy
+  ufuncs in the formula namespace; array formulas now work correctly
+- Replaced bare `except:` and `except Exception: pass` blocks across `main.py`,
+  `dialogs.py`, `mainwindow.py`, `palettes.py`, and `preferences.py` with
+  specific exception types and stderr warnings so failures are visible
+- CLI parser: per-file `--x`/`--y` no longer bleed into subsequent files
+- Version aligned to `0.5.1` across `pyproject.toml`, `__init__.py`, and `state.py`
+- Package data path corrected to include `logo/` directory
 
 ## [0.5.0] - 2026-03-27
 
