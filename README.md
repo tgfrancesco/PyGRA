@@ -47,6 +47,9 @@ Pre-built installers are available on the [Releases page](https://github.com/tgf
 | Windows | `PyGRA.exe` | Run directly |
 
 No Python installation required.
+**macOS:** Open the DMG and drag PyGRA to Applications.
+On first launch go to **System Settings → Privacy & Security → Open Anyway**
+if macOS blocks the app. This is a one-time step.
 
 ## Installation
 
