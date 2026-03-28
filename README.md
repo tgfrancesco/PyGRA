@@ -36,6 +36,18 @@
 - Statistics dialog per series
 - Minimal custom toolbar: Zoom, Pan, Reset
 
+## Download
+
+Pre-built installers are available on the [Releases page](https://github.com/tgfrancesco/PyGRA/releases/latest):
+
+| Platform | File | Notes |
+|----------|------|-------|
+| macOS | `PyGRA-macos.dmg` | Mount and drag to Applications. On first launch, go to System Settings → Privacy & Security → Open Anyway if macOS blocks the app. |
+| Linux | `PyGRA-linux.tar.gz` | Extract and run `./PyGRA/PyGRA` |
+| Windows | `PyGRA.exe` | Run directly |
+
+No Python installation required.
+
 ## Installation
 
 ### With conda (recommended)
