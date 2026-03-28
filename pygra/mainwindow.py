@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QDialog, QShortcut, QAction, QPushButton, QFrame,
     QScrollArea,
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QKeySequence, QIcon
 
 import matplotlib
@@ -173,6 +173,7 @@ class MainWindow(QMainWindow):
                                for k, v in DEFAULT_STYLE_SETTINGS.items()}
         self._legend_pos = None
         self._dragging_legend = False
+        self._palette_actions: dict = {}
         self._build_ui()
         self._build_menu()
         self._restore_geometry()
@@ -204,17 +205,25 @@ class MainWindow(QMainWindow):
         view_menu.addSeparator()
 
         # Color palette submenu
-        from PyQt5.QtWidgets import QMenu
+        from PyQt5.QtWidgets import QMenu, QActionGroup
         from .palettes import PALETTE_GROUPS
         palette_menu = view_menu.addMenu("Color palette")
+        ag = QActionGroup(self)
+        ag.setExclusive(True)
         default_act = palette_menu.addAction("Qt default")
+        default_act.setCheckable(True)
         default_act.triggered.connect(lambda: self._set_palette(""))
+        ag.addAction(default_act)
+        self._palette_actions[""] = default_act
         palette_menu.addSeparator()
         for group, names in PALETTE_GROUPS.items():
             grp_menu = palette_menu.addMenu(group)
             for name in names:
                 act = grp_menu.addAction(name)
+                act.setCheckable(True)
                 act.triggered.connect(lambda checked, n=name: self._set_palette(n))
+                ag.addAction(act)
+                self._palette_actions[name] = act
 
         view_menu.addSeparator()
         self._act(view_menu, "Save preferences",  None,     self._save_preferences)
@@ -390,6 +399,11 @@ class MainWindow(QMainWindow):
         saved_palette = p.get("last_basic_palette", "")
         if saved_palette:
             apply_basic_palette(saved_palette)
+        def _check_palette_action():
+            act = self._palette_actions.get(saved_palette) or self._palette_actions.get("")
+            if act:
+                act.setChecked(True)
+        QTimer.singleShot(0, _check_palette_action)
 
     def _collect_geometry(self) -> dict:
         geo  = self.geometry()
@@ -409,6 +423,8 @@ class MainWindow(QMainWindow):
         else:
             restore_basic_palette()
         self._prefs["last_basic_palette"] = name
+        if name in self._palette_actions:
+            self._palette_actions[name].setChecked(True)
         try:
             from .preferences import save_prefs
             prefs = dict(self._prefs)

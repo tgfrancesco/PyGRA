@@ -105,6 +105,9 @@ def pick_color(current: str, parent=None) -> str:
         custom = []
         prefs = {}
 
+    saved_palette = prefs.get("last_basic_palette", "")
+    palette_label = saved_palette if saved_palette else "Qt default"
+
     for i, hex_c in enumerate(custom[:16]):
         try:
             QColorDialog.setCustomColor(i, QColor(hex_c))
@@ -112,11 +115,13 @@ def pick_color(current: str, parent=None) -> str:
             print(f"Warning: could not restore custom color slot {i} ({hex_c!r}): {e}", file=sys.stderr)
 
     import sys
+    title = f"Pick Color  —  Basic colors palette: {palette_label}"
     if sys.platform == "darwin":
         # On macOS, "Pick Screen Color" only captures within the dialog window
         # due to system security restrictions — hide it to avoid confusion
         cd = QColorDialog(QColor(current), parent)
         cd.setOptions(QColorDialog.DontUseNativeDialog)
+        cd.setWindowTitle(title)
         try:
             from PyQt5.QtWidgets import QAbstractButton
             for btn in cd.findChildren(QAbstractButton):
@@ -130,6 +135,7 @@ def pick_color(current: str, parent=None) -> str:
     else:
         c = QColorDialog.getColor(
             QColor(current), parent,
+            title=title,
             options=QColorDialog.DontUseNativeDialog,
         )
     if not c.isValid():
