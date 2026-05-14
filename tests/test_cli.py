@@ -1,6 +1,12 @@
 """Tests for pygra.main CLI parsing."""
 
+import tempfile
+import os
+
+import numpy as np
+
 from pygra.main import _parse_interleaved
+from pygra.dataset import DataSet
 
 
 class TestParseInterleaved:
@@ -58,3 +64,52 @@ class TestParseInterleaved:
         assert args["files"] == [
             {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0}
         ]
+
+    def test_downsampling_default_is_one(self):
+        args = _parse_interleaved(["a.dat"])
+        assert args["downsampling"] == 1
+
+    def test_downsampling_long_flag(self):
+        args = _parse_interleaved(["a.dat", "--downsampling", "10"])
+        assert args["downsampling"] == 10
+
+    def test_downsampling_short_flag(self):
+        args = _parse_interleaved(["a.dat", "-s", "5"])
+        assert args["downsampling"] == 5
+
+
+class TestDataSetDownsampling:
+
+    def _make_file(self, rows: int):
+        """Write a two-column file with *rows* rows and return its path."""
+        fd, path = tempfile.mkstemp(suffix=".dat")
+        with os.fdopen(fd, "w") as f:
+            for i in range(rows):
+                f.write(f"{i} {i * 2}\n")
+        return path
+
+    def test_step_1_gives_all_rows(self):
+        path = self._make_file(10)
+        try:
+            ds = DataSet(path, step=1)
+            assert ds.nrows == 10
+        finally:
+            os.unlink(path)
+
+    def test_step_2_gives_every_other_row(self):
+        path = self._make_file(10)
+        try:
+            ds = DataSet(path, step=2)
+            assert ds.nrows == 5
+            assert np.array_equal(ds.arr[:, 0], np.arange(0, 10, 2, dtype=float))
+        finally:
+            os.unlink(path)
+
+    def test_default_step_no_downsampling(self):
+        path = self._make_file(6)
+        try:
+            ds = DataSet(path)
+            assert ds.nrows == 6
+            assert ds.downsample_step == 1
+        finally:
+            os.unlink(path)

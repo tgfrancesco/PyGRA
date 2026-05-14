@@ -46,17 +46,22 @@ class DataSet:
         parsed.  Line numbers are 1-based.
     """
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, step: int = 1):
         """
         Parameters
         ----------
         path : str
             Path to the data file to load.
+        step : int, optional
+            Load every *step*-th row (default 1, no downsampling).
         """
         self.path = path
         self.name = Path(path).name
         self.raw: list = []
+        self.downsample_step = step
         self._load()
+        if step > 1:
+            self.arr = self.arr[::step]
 
     def _load(self):
         self.skipped_rows: list[tuple[int, str]] = []

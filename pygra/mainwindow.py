@@ -719,9 +719,9 @@ class MainWindow(QMainWindow):
             self._load_file(path)
 
     def _load_file(self, path: str, xcol: int = 0, ycol: int = 1,
-                   dxcol: int = 0, dycol: int = 0):
+                   dxcol: int = 0, dycol: int = 0, step: int = 1):
         try:
-            ds = DataSet(path)
+            ds = DataSet(path, step=step)
             if ds.skipped_rows:
                 n = len(ds.skipped_rows)
                 examples = "\n".join(

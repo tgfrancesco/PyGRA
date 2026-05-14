@@ -28,6 +28,7 @@ Options:
   --dy COL              y error bar column index (0-based) for the preceding
                         --file. If given after all files, applies to all.
                         Default: 0 (no y error bars)
+  -s, --downsampling N  Load every N-th row from each file (default: 1, no downsampling)
   -l, --load FILE       Load a previously saved session (.json)
   -h, --help            Show this help message and exit
 
@@ -46,6 +47,9 @@ Examples:
 
   # specify error bars
   pygra --file data.dat --x 0 --y 1 --dy 2
+
+  # load every 100th row (useful for large files)
+  pygra idx_*.csv --x 3 --y 4 --downsampling 100
 
   # load a saved session
   pygra --load session.json
@@ -70,9 +74,9 @@ def _parse_interleaved(argv: list) -> dict:
     Returns
     -------
     dict
-        ``{"files": list[dict], "load": str | None}`` where each file
-        dict has keys ``"path"`` (str), ``"xcol"`` (int), ``"ycol"``
-        (int), ``"dxcol"`` (int), and ``"dycol"`` (int).
+        ``{"files": list[dict], "load": str | None, "downsampling": int}``
+        where each file dict has keys ``"path"`` (str), ``"xcol"`` (int),
+        ``"ycol"`` (int), ``"dxcol"`` (int), and ``"dycol"`` (int).
     """
     if any(tok in ("-h", "--help") for tok in argv):
         print(HELP_TEXT)
@@ -80,6 +84,7 @@ def _parse_interleaved(argv: list) -> dict:
 
     files = []
     load = None
+    downsampling = 1
     global_cols = {"xcol": None, "ycol": None, "dxcol": None, "dycol": None}
     col_options = {
         "--x": "xcol",
@@ -96,7 +101,8 @@ def _parse_interleaved(argv: list) -> dict:
             nxt = argv[j]
             if nxt in ("--file", "-f"):
                 return True
-            if nxt in ("--load", "-l", "--x", "--y", "--dx", "--dy"):
+            if nxt in ("--load", "-l", "--x", "--y", "--dx", "--dy",
+                       "--downsampling", "-s"):
                 j += 2
                 continue
             if not nxt.startswith("-"):
@@ -110,6 +116,12 @@ def _parse_interleaved(argv: list) -> dict:
         if tok in ("--load", "-l"):
             i += 1
             load = argv[i] if i < len(argv) else None
+        elif tok in ("--downsampling", "-s"):
+            i += 1
+            try:
+                downsampling = max(1, int(argv[i]))
+            except (ValueError, IndexError):
+                pass
         elif tok in ("--file", "-f"):
             i += 1
             if i < len(argv):
@@ -145,7 +157,7 @@ def _parse_interleaved(argv: list) -> dict:
             if f[key] is None:
                 f[key] = global_cols[key] if global_cols[key] is not None else default
 
-    return {"files": files, "load": load}
+    return {"files": files, "load": load, "downsampling": downsampling}
 
 
 def main():
@@ -198,6 +210,7 @@ def main():
             ycol=f["ycol"],
             dxcol=f["dxcol"],
             dycol=f["dycol"],
+            step=args["downsampling"],
         )
 
     win.show()

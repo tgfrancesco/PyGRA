@@ -5,6 +5,8 @@
 ### Added
 - CLI: `--dx` and `--dy` options to specify error bar columns per file 
   or globally (same semantics as `--x`/`--y`)
+- CLI: `-s`/`--downsampling N` option to load every N-th row, useful 
+  for very large files (e.g. `pygra idx_*.csv --x 3 --y 4 -s 100`)
 
 ### Fixed
 - CSV files with comma delimiter now load correctly (auto-delimiter detection)

@@ -156,12 +156,12 @@ pygra --load session.json
 # help
 pygra --help
 ```
-
 **CLI rules:**
 - Files can be passed as positional arguments: `pygra *.dat` works as expected
-- `--x` / `--y` immediately after `--file` apply to that specific file only
-- `--x` / `--y` after all files apply to all of them
-- Default columns: x=0, y=1
+- `--x` / `--y` / `--dx` / `--dy` immediately after `--file` apply to that specific file only
+- `--x` / `--y` / `--dx` / `--dy` after all files apply to all of them
+- Default columns: x=0, y=1, dx=0 (none), dy=0 (none)
+- `-s` / `--downsampling N` loads every N-th row from all files — useful for very large files
 
 ## File format
 
