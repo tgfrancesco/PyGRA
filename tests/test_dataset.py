@@ -116,6 +116,42 @@ class TestDataSetLoading:
         linenos = [ln for ln, _ in ds.skipped_rows]
         assert linenos == [3, 5]
 
+    def test_csv_comma_delimiter_values(self, tmp_path):
+        p = tmp_path / "data.csv"
+        p.write_text("1.0,2.0\n3.0,4.0\n5.0,6.0\n")
+        ds = DataSet(str(p))
+        assert ds.nrows == 3
+        assert ds.ncols == 2
+        np.testing.assert_array_equal(ds.col(0), [1.0, 3.0, 5.0])
+        np.testing.assert_array_equal(ds.col(1), [2.0, 4.0, 6.0])
+
+    def test_csv_comma_no_skipped_rows(self, tmp_path):
+        p = tmp_path / "data.csv"
+        p.write_text("1.0,2.0\n3.0,4.0\n")
+        ds = DataSet(str(p))
+        assert ds.skipped_rows == []
+
+    def test_hash_comment_lines_not_in_skipped_rows(self, tmp_path):
+        p = tmp_path / "data.dat"
+        p.write_text("# column header\n1.0 2.0\n# note\n3.0 4.0\n")
+        ds = DataSet(str(p))
+        assert ds.skipped_rows == []
+        assert ds.nrows == 2
+
+    def test_header_line_skipped_silently(self, tmp_path):
+        p = tmp_path / "data.dat"
+        p.write_text("x y\n1.0 2.0\n3.0 4.0\n")
+        ds = DataSet(str(p))
+        assert ds.nrows == 2
+        assert ds.skipped_rows == []
+
+    def test_csv_header_line_skipped_silently(self, tmp_path):
+        p = tmp_path / "data.csv"
+        p.write_text("x,y\n1.0,2.0\n3.0,4.0\n")
+        ds = DataSet(str(p))
+        assert ds.nrows == 2
+        assert ds.skipped_rows == []
+
 
 # ---------------------------------------------------------------------------
 # apply_transform

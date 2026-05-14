@@ -2,10 +2,19 @@
 dataset.py — data loading and transform operations
 """
 
+import csv
 from pathlib import Path
 
 import numpy as np
 from scipy.signal import savgol_filter
+
+
+def _can_float(s: str) -> bool:
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 
 class DataSet:
@@ -50,16 +59,41 @@ class DataSet:
         self._load()
 
     def _load(self):
-        self.skipped_rows: list[tuple[int, str]] = []  # (line_number, content)
+        self.skipped_rows: list[tuple[int, str]] = []
         with open(self.path) as f:
-            for lineno, line in enumerate(f, start=1):
-                line = line.strip()
-                if not line or line.startswith("#"):
+            lines = f.readlines()
+
+        # Detect delimiter from the first non-comment, non-empty line
+        use_csv = False
+        for raw_line in lines:
+            stripped = raw_line.strip()
+            if stripped and not stripped.startswith('#'):
+                use_csv = ',' in stripped
+                break
+
+        header_consumed = False
+        for lineno, raw_line in enumerate(lines, start=1):
+            line = raw_line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            if use_csv:
+                tokens = [t.strip() for t in next(csv.reader([line]))]
+            else:
+                tokens = line.split()
+
+            try:
+                row = [float(t) for t in tokens]
+            except ValueError:
+                if not header_consumed and not any(_can_float(t) for t in tokens):
+                    header_consumed = True
                     continue
-                try:
-                    self.raw.append([float(v) for v in line.split()])
-                except ValueError:
-                    self.skipped_rows.append((lineno, line))
+                self.skipped_rows.append((lineno, line))
+                continue
+
+            self.raw.append(row)
+            header_consumed = True
+
         self.arr = np.array(self.raw) if self.raw else np.empty((0, 0))
 
     @property
