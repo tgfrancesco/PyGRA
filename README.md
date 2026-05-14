@@ -165,7 +165,8 @@ pygra --help
 
 ## File format
 
-Whitespace-delimited, one row per data point. Lines starting with `#` are ignored.
+Whitespace-delimited or comma-separated (CSV), one row per data point. 
+Lines starting with `#` and non-numeric header lines are ignored automatically.
 
 ```
 # x   y    dy

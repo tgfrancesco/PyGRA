@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.2] - 2026-05-14
+
+### Added
+- CLI: `--dx` and `--dy` options to specify error bar columns per file 
+  or globally (same semantics as `--x`/`--y`)
+
+### Fixed
+- CSV files with comma delimiter now load correctly (auto-delimiter detection)
+- Lines starting with `#` are silently skipped without triggering a warning
+- Non-numeric header lines (first line) are silently skipped
+
 ## [0.8.1] - 2026-04-30
 
 ### Added

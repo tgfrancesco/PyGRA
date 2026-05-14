@@ -42,7 +42,7 @@ def save_state(path: str, dataset_widgets: list, axis_settings: dict,
             "config": cfg,
         })
     state = {
-        "version":        "0.8.1",
+        "version":        "0.8.2",
         "series":         series,
         "axis_settings":  axis_settings,
         "style_settings": style_settings,
