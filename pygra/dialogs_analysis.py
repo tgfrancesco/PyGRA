@@ -108,6 +108,10 @@ class FitDialog(QDialog):
         self.custom_params = QLineEdit(custom_params_default)
         form.addRow("Custom params (space-sep):", self.custom_params)
 
+        self.custom_p0 = QLineEdit(self._cfg.get("custom_p0", ""))
+        self.custom_p0.setPlaceholderText("leave empty for auto")
+        form.addRow("Initial parameters (comma-sep):", self.custom_p0)
+
         # fit line color
         self.color_btn = QPushButton()
         self._refresh_btn(self.color_btn, self._color)
@@ -158,6 +162,7 @@ class FitDialog(QDialog):
         self.formula_lbl.setVisible(not is_custom)
         self.custom_formula.setEnabled(is_custom)
         self.custom_params.setEnabled(is_custom)
+        self.custom_p0.setEnabled(is_custom)
         self.poly_deg.setEnabled(is_poly)
 
     def _refresh_btn(self, btn, color):
@@ -191,6 +196,7 @@ class FitDialog(QDialog):
             "poly_deg":       self.poly_deg.value(),
             "custom_formula": self.custom_formula.text().strip(),
             "custom_params":  self.custom_params.text().strip().split(),
+            "custom_p0":      self.custom_p0.text().strip(),
             "fit_color":      self._color,
             "fit_xmin":       xmin_val,
             "fit_xmax":       xmax_val,

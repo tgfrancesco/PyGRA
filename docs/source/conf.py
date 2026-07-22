@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath("../.."))  # points to PyGRA/ root
 project = "PyGRA"
 copyright = "2026, Francesco Tosti Guerra"
 author = "Francesco Tosti Guerra"
-release = "0.8.2"
+release = "0.8.3"
 
 # -- General configuration ---------------------------------------------------
 extensions = [

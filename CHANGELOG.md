@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.3] - 2026-07-22
+
+### Fixed
+- Custom fit now correctly fits (x,y) data in Series mode and histogram 
+  data in Histogram mode (previously always fitted the histogram)
+- Improved placeholder text for "Initial parameters" field in Fit dialog
+
+### Added
+- Custom fit: optional initial parameters field in Fit dialog
+
 ## [0.8.2] - 2026-05-14
 
 ### Added

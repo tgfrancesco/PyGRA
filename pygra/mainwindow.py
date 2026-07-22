@@ -888,6 +888,7 @@ class MainWindow(QMainWindow):
             "poly_deg":       3,
             "custom_formula": "a * exp(-b * x)",
             "custom_params":  ["a", "b"],
+            "custom_p0":      "",
             "fit_color":      "#d62728",
         })
         dlg = FitDialog(fit_cfg, self)
@@ -977,9 +978,26 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, f"Fit: {method}", f"{lbl}\n\nParameters:\n{param_str}")
 
             elif method == "Custom...":
-                xf, yf, lbl, params = fit_custom(
-                    data, fit_cfg["custom_formula"], fit_cfg["custom_params"]
-                )
+                raw_p0 = fit_cfg.get("custom_p0", "").strip()
+                p0_arg = None
+                if raw_p0:
+                    try:
+                        p0_arg = [float(v) for v in raw_p0.split(",")]
+                    except ValueError:
+                        QMessageBox.warning(self, "Fit", "Invalid initial parameters — using auto.")
+                if cfg["hist_mode"]:
+                    xf, yf, lbl, params = fit_custom(
+                        data, None,
+                        fit_cfg["custom_formula"], fit_cfg["custom_params"], p0=p0_arg,
+                    )
+                else:
+                    if x_src is None or y_src is None:
+                        QMessageBox.warning(self, "Fit", "Custom fit requires x and y columns.")
+                        return
+                    xf, yf, lbl, params = fit_custom(
+                        x_src, y_src,
+                        fit_cfg["custom_formula"], fit_cfg["custom_params"], p0=p0_arg,
+                    )
                 param_str = "\n".join(f"  {k} = {v:.6g}" for k, v in params.items())
                 QMessageBox.information(self, "Custom fit", f"{lbl}\n\nParameters:\n{param_str}")
 

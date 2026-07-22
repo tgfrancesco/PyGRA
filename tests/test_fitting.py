@@ -215,38 +215,38 @@ class TestFitCustom:
         return np.random.default_rng(0).uniform(1.0, 4.0, size=3000)
 
     def test_returns_four_elements(self, uniform_data):
-        assert len(fit_custom(uniform_data, formula="a * x + b", param_names=["a", "b"])) == 4
+        assert len(fit_custom(uniform_data, None, formula="a * x + b", param_names=["a", "b"])) == 4
 
     def test_x_and_y_length(self, uniform_data):
-        x, y, _, _ = fit_custom(uniform_data, formula="a * x + b", param_names=["a", "b"])
+        x, y, _, _ = fit_custom(uniform_data, None, formula="a * x + b", param_names=["a", "b"])
         assert len(x) == 300
         assert len(y) == 300
 
     def test_x_spans_data_range(self, uniform_data):
-        x, _, _, _ = fit_custom(uniform_data, formula="a * x + b", param_names=["a", "b"])
+        x, _, _, _ = fit_custom(uniform_data, None, formula="a * x + b", param_names=["a", "b"])
         assert x.min() == pytest.approx(uniform_data.min())
         assert x.max() == pytest.approx(uniform_data.max())
 
     def test_label_contains_custom(self, uniform_data):
-        _, _, label, _ = fit_custom(uniform_data, formula="a * x + b", param_names=["a", "b"])
+        _, _, label, _ = fit_custom(uniform_data, None, formula="a * x + b", param_names=["a", "b"])
         assert "Custom" in label
 
     def test_label_contains_param_names(self, uniform_data):
-        _, _, label, _ = fit_custom(uniform_data, formula="a * x + b", param_names=["a", "b"])
+        _, _, label, _ = fit_custom(uniform_data, None, formula="a * x + b", param_names=["a", "b"])
         assert "a=" in label
         assert "b=" in label
 
     def test_params_keys_match_param_names(self, uniform_data):
-        _, _, _, params = fit_custom(uniform_data, formula="a * x + b", param_names=["a", "b"])
+        _, _, _, params = fit_custom(uniform_data, None, formula="a * x + b", param_names=["a", "b"])
         assert set(params.keys()) == {"a", "b"}
 
     def test_y_values_are_finite(self, uniform_data):
-        _, y, _, _ = fit_custom(uniform_data, formula="a * x + b", param_names=["a", "b"])
+        _, y, _, _ = fit_custom(uniform_data, None, formula="a * x + b", param_names=["a", "b"])
         assert np.all(np.isfinite(y))
 
     def test_three_param_formula(self, uniform_data):
         _, _, _, params = fit_custom(
-            uniform_data, formula="a * x * x + b * x + c", param_names=["a", "b", "c"]
+            uniform_data, None, formula="a * x * x + b * x + c", param_names=["a", "b", "c"]
         )
         assert set(params.keys()) == {"a", "b", "c"}
 
@@ -254,9 +254,25 @@ class TestFitCustom:
         # numpy ufuncs must take priority over math scalars in safe_ns so that
         # exp(), sqrt(), log() etc. work correctly on numpy arrays.
         data = np.random.default_rng(1).exponential(scale=1.0, size=2000)
-        x, y, _, params = fit_custom(data, formula="a * exp(-b * x)", param_names=["a", "b"])
+        x, y, _, params = fit_custom(data, None, formula="a * exp(-b * x)", param_names=["a", "b"])
         assert set(params.keys()) == {"a", "b"}
         assert np.all(np.isfinite(y))
+
+    def test_xy_mode_fits_directly(self):
+        # xy mode should fit against the supplied points, not a histogram
+        rng = np.random.default_rng(7)
+        x = np.linspace(0, 5, 100)
+        y = 3.0 * x + 1.5 + rng.normal(0, 0.05, 100)
+        _, _, _, params = fit_custom(x, y, formula="a * x + b", param_names=["a", "b"])
+        assert params["a"] == pytest.approx(3.0, abs=0.1)
+        assert params["b"] == pytest.approx(1.5, abs=0.2)
+
+    def test_xy_mode_x_spans_input_range(self):
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([2.0, 4.0, 6.0, 8.0, 10.0])
+        x_out, _, _, _ = fit_custom(x, y, formula="a * x + b", param_names=["a", "b"])
+        assert x_out.min() == pytest.approx(x.min())
+        assert x_out.max() == pytest.approx(x.max())
 
 
 # ---------------------------------------------------------------------------

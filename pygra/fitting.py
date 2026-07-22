@@ -196,9 +196,9 @@ def fit_exponential_curve(x: np.ndarray, y: np.ndarray):
     return x_fine, y_fine, label, {"A": A, "τ": tau, "C": C}
 
 
-def fit_custom(data: np.ndarray, formula: str, param_names: list):
+def fit_custom(x_or_data, y_or_none, formula, param_names, p0=None):
     """
-    Fit a user-defined formula to the density histogram of *data*.
+    Fit a user-defined formula to xy data or to a density histogram.
 
     The formula is evaluated in a sandboxed namespace that exposes NumPy
     ufuncs (e.g. ``exp``, ``sin``, ``sqrt``) and math constants.  NumPy
@@ -207,19 +207,26 @@ def fit_custom(data: np.ndarray, formula: str, param_names: list):
 
     Parameters
     ----------
-    data : numpy.ndarray
-        1-D array of sample values used to build the histogram.
+    x_or_data : numpy.ndarray
+        In xy mode (``y_or_none`` is not ``None``): x coordinates.
+        In histogram mode (``y_or_none`` is ``None``): 1-D sample values
+        from which a density histogram is built.
+    y_or_none : numpy.ndarray or None
+        y coordinates for xy mode, or ``None`` to enable histogram mode.
     formula : str
         Python expression in terms of ``x`` and the names listed in
         *param_names*.  Example: ``"a * exp(-b * x)"``.
     param_names : list of str
         Names of the free parameters appearing in *formula*.
-        All initial guesses are set to 1.0.
+    p0 : list of float, optional
+        Initial parameter guesses.  When ``None`` (default), each
+        parameter is initialised to ``mean(|y|)`` (xy mode) or
+        ``mean(|histogram counts|)`` (histogram mode).
 
     Returns
     -------
     x : numpy.ndarray
-        300 evenly-spaced points spanning ``[data.min(), data.max()]``.
+        300 evenly-spaced points spanning the input x range.
     y : numpy.ndarray
         Formula evaluated at *x* with the optimised parameters.
     label : str
@@ -233,11 +240,6 @@ def fit_custom(data: np.ndarray, formula: str, param_names: list):
         If the covariance of the parameters could not be estimated.
     RuntimeError
         If the least-squares minimisation fails entirely.
-
-    Notes
-    -----
-    All initial parameter guesses are 1.0.  Formulas that require very
-    different starting points may not converge from these defaults.
     """
     import math
     safe_ns = {k: getattr(math, k) for k in dir(math) if not k.startswith("_")}
@@ -250,11 +252,25 @@ def fit_custom(data: np.ndarray, formula: str, param_names: list):
             ns[name] = val
         return eval(formula, {"__builtins__": {}}, ns)
 
-    counts, edges = np.histogram(data, bins="auto", density=True)
-    x_centers = 0.5 * (edges[:-1] + edges[1:])
-    p0 = [1.0] * len(param_names)
-    popt, _ = curve_fit(model, x_centers, counts, p0=p0, maxfev=10000)
-    x_fine = np.linspace(data.min(), data.max(), 300)
+    if y_or_none is not None:
+        x_fit = x_or_data
+        y_fit = y_or_none
+        if p0 is None:
+            scale = float(np.mean(np.abs(y_fit))) or 1.0
+            p0 = [scale] * len(param_names)
+    else:
+        counts, edges = np.histogram(x_or_data, bins="auto", density=True)
+        x_fit = 0.5 * (edges[:-1] + edges[1:])
+        y_fit = counts
+        if p0 is None:
+            scale = float(np.mean(np.abs(counts)))
+            p0 = [scale] * len(param_names)
+
+    popt, _ = curve_fit(
+        model, x_fit, y_fit, p0=p0,
+        bounds=(-np.inf, np.inf), maxfev=10000,
+    )
+    x_fine = np.linspace(x_or_data.min(), x_or_data.max(), 300)
     y_fine = model(x_fine, *popt)
     params_dict = {n: v for n, v in zip(param_names, popt)}
     label = "Custom  " + "  ".join(f"{n}={v:.4g}" for n, v in params_dict.items())
