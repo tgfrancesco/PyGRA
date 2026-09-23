@@ -4,4 +4,6 @@ ignore = [
     "E702",   # multiple statements on one line (semicolon)
     "F401",   # imported but unused — needed for public re-exports
     "F811",   # redefinition of unused name
+    "EXE001", # shebang present but file not executable
+    "I001",   # import block unsorted
 ]
