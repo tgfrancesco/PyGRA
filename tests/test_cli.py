@@ -43,6 +43,21 @@ class TestParseInterleaved:
             {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0}
         ]
 
+    def test_load_path_never_appears_in_files(self):
+        for argv in (["--load", "s.json"], ["-l", "s.json"],
+                     ["--load=s.json"], ["-l=s.json"],
+                     ["a.dat", "--load", "s.json", "--y", "2"],
+                     ["-f", "a.dat", "-l", "s.json", "--file", "b.dat"],
+                     ["s.json", "--load", "s.json"]):
+            args = _parse_interleaved(argv)
+            assert args["load"] == "s.json", argv
+            assert all(f["path"] != "s.json" for f in args["files"]), argv
+
+    def test_load_without_path_does_not_consume_next_option(self):
+        args = _parse_interleaved(["--load", "--file", "a.dat"])
+        assert args["load"] is None
+        assert [f["path"] for f in args["files"]] == ["a.dat"]
+
     def test_per_file_error_columns_do_not_leak_to_later_files(self):
         args = _parse_interleaved(
             ["--file", "a.dat", "--dx", "2", "--dy", "3", "--file", "b.dat"]

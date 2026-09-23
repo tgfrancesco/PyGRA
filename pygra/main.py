@@ -131,8 +131,12 @@ def _parse_interleaved(argv: list) -> dict:
     while i < len(argv):
         tok = argv[i]
         if tok in ("--load", "-l"):
-            i += 1
-            load = argv[i] if i < len(argv) else None
+            # the session path is consumed here and never added to files
+            if i + 1 < len(argv) and not argv[i + 1].startswith("-"):
+                i += 1
+                load = argv[i]
+        elif tok.startswith(("--load=", "-l=")):
+            load = tok.split("=", 1)[1] or None
         elif tok in ("--downsampling", "-s"):
             i += 1
             try:
@@ -158,6 +162,9 @@ def _parse_interleaved(argv: list) -> dict:
         elif not tok.startswith("-"):
             files.append(_new_file(tok))
         i += 1
+
+    if load is not None:
+        files = [f for f in files if f["path"] != load]
 
     for f in files:
         for key, default in defaults.items():

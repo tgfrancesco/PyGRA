@@ -392,6 +392,10 @@ class AppearanceDialog(QDialog):
         self.band_alpha.setValue(self._cfg.get("band_alpha", 0.25))
         form.addRow("Band alpha:", self.band_alpha)
 
+        self.zorder = QSpinBox(); self.zorder.setRange(1, 10)
+        self.zorder.setValue(self._cfg.get("zorder", 2))
+        form.addRow("Z-order:", self.zorder)
+
         layout.addLayout(form)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self.accept)
@@ -427,7 +431,7 @@ class AppearanceDialog(QDialog):
             ``"linewidth"`` (float), ``"marker"`` (str),
             ``"markersize"`` (float), ``"color"`` (str),
             ``"face_color"`` (str), ``"error_style"`` (str),
-            ``"band_alpha"`` (float).
+            ``"band_alpha"`` (float), ``"zorder"`` (int).
         """
         return {
             "label":      self.label_edit.text(),
@@ -439,6 +443,7 @@ class AppearanceDialog(QDialog):
             "face_color": self._face_color,
             "error_style": self.error_style.currentText(),
             "band_alpha":  self.band_alpha.value(),
+            "zorder":      self.zorder.value(),
         }
 
 

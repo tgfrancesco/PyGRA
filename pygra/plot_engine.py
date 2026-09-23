@@ -191,6 +191,7 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
             markerfacecolor=cfg["face_color"],
             markeredgecolor=cfg["color"],
             label=cfg["label"],
+            zorder=cfg.get("zorder", 2),
         )
 
         has_err = has_asym or dy is not None or dx is not None

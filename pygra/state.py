@@ -35,11 +35,17 @@ def save_state(path: str, dataset_widgets: list, axis_settings: dict,
     series = []
     for dw in dataset_widgets:
         cfg = dw.get_config()
+        # get_config() only merges the active mode's style, and series and
+        # histogram styles share keys (color, face_color), so each style
+        # dict is also stored separately to survive a mode switch.
         series.append({
             "path":   dw.dataset.path,
             "name":   dw.dataset.name,
             "data":   dw.dataset.arr.tolist(),
             "config": cfg,
+            "series_style": dict(getattr(dw, "_series_style", {})),
+            "hist_style":   dict(getattr(dw, "_hist_style", {})),
+            "hist2d_style": dict(getattr(dw, "_hist2d_style", {})),
         })
     state = {
         "version":        "0.9.0",
@@ -68,7 +74,10 @@ def load_state(path: str) -> dict:
     -------
     dict
         State dictionary with keys ``"version"``, ``"series"``,
-        ``"axis_settings"``, and ``"style_settings"``.  The ``"data"``
+        ``"axis_settings"``, ``"style_settings"``, and ``"annotations"``.
+        Each series entry has ``"config"`` and, for sessions saved by
+        v0.9.0 or later, ``"series_style"``, ``"hist_style"``, and
+        ``"hist2d_style"``.  The ``"data"``
         value inside each series entry is a 2-D ``numpy.ndarray``.
 
     Raises

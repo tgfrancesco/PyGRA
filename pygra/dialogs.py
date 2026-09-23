@@ -8,6 +8,6 @@ All dialog classes and helpers live in the submodules:
   dialogs_misc.py     — TextAnnotationDialog, PaletteDialog
 """
 
-from .dialogs_style import *       # noqa: F401,F403
-from .dialogs_analysis import *    # noqa: F401,F403
-from .dialogs_misc import *        # noqa: F401,F403
+from .dialogs_style import *
+from .dialogs_analysis import *
+from .dialogs_misc import *

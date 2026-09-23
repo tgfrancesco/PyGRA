@@ -340,6 +340,8 @@ class MainWindow(QMainWindow):
         self.datasets_tab = QTabWidget()
         self.datasets_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.datasets_tab.setTabsClosable(True)
+        self.datasets_tab.setMovable(True)
+        self.datasets_tab.tabBar().tabMoved.connect(self._on_tab_moved)
         self.datasets_tab.tabCloseRequested.connect(self._close_tab)
         self.datasets_tab.currentChanged.connect(self._on_datasets_tab_changed)
         lv.addWidget(self.datasets_tab, stretch=1)
@@ -788,6 +790,13 @@ class MainWindow(QMainWindow):
             self.datasets_tab.setCurrentIndex(index)
             self._syncing_series_nav = False
 
+    def _on_tab_moved(self, from_idx: int, to_idx: int):
+        # keep dataset_widgets in tab order (drives plot and legend order);
+        # no replot needed — user will press Plot
+        widget = self.dataset_widgets.pop(from_idx)
+        self.dataset_widgets.insert(to_idx, widget)
+        self._refresh_series_combo()
+
     def _on_datasets_tab_changed(self, index: int):
         if self._syncing_series_nav:
             return
@@ -1197,24 +1206,31 @@ class MainWindow(QMainWindow):
             self.datasets.append(ds)
             dw = self._add_dataset_widget(ds)
             cfg = s["config"]
-            dw.xcol.setValue(cfg.get("xcol", 0))
-            dw.ycol.setValue(cfg.get("ycol", 1))
+            hist2d = cfg.get("hist2d_mode", False)
+            # in hist2d mode get_config() reports xcol2/ycol2 as xcol/ycol
+            (dw.xcol2 if hist2d else dw.xcol).setValue(cfg.get("xcol", 0))
+            (dw.ycol2 if hist2d else dw.ycol).setValue(cfg.get("ycol", 1))
             dw.dxcol.setValue(cfg.get("dxcol", -1))
             dw.dycol.setValue(cfg.get("dycol", -1))
+            dw.dy_low_col.setValue(cfg.get("dy_low_col", -1))
+            dw.dy_high_col.setValue(cfg.get("dy_high_col", -1))
+            dw.hcol.setValue(cfg.get("hcol", 0))
             dw._series_style["label"] = cfg.get("label", ds.name)
-            if cfg.get("hist2d_mode", False):
+            if hist2d:
                 dw.set_mode("hist2d")
             elif cfg.get("hist_mode", False):
                 dw.set_mode("histogram")
             else:
                 dw.set_mode("series")
             dw.visible.setChecked(cfg.get("visible", True))
-            for k in dw._series_style:
-                if k in cfg: dw._series_style[k] = cfg[k]
-            for k in dw._hist_style:
-                if k in cfg: dw._hist_style[k] = cfg[k]
-            for k in dw._hist2d_style:
-                if k in cfg: dw._hist2d_style[k] = cfg[k]
+            # per-mode style dicts (v0.9.0+); older sessions only have the
+            # flat config, which holds the active mode's style
+            for key, style in (("series_style", dw._series_style),
+                               ("hist_style",   dw._hist_style),
+                               ("hist2d_style", dw._hist2d_style)):
+                saved = s.get(key, cfg)
+                for k in style:
+                    if k in saved: style[k] = saved[k]
 
         self._apply_axis_settings(state.get("axis_settings", {}))
         self.style_settings = state.get("style_settings", dict(DEFAULT_STYLE_SETTINGS))
