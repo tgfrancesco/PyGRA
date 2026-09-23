@@ -10,7 +10,8 @@ PyGRA — interactive scientific data plotter
 
 Usage:
   pygra [file ...] [options]
-  pygra --file FILE [--x COL] [--y COL] [--dx COL] [--dy COL] [--file FILE ...] [options]
+  pygra --file FILE [--x COL] [--y COL] [--dx COL] [--dy COL]
+        [--dy_low COL] [--dy_high COL] [--file FILE ...] [options]
 
 Positional arguments:
   file                  One or more data files. The shell expands glob
@@ -28,6 +29,12 @@ Options:
   --dy COL              y error bar column index (0-based) for the preceding
                         --file. If given after all files, applies to all.
                         Default: 0 (no y error bars)
+  --dy_low COL          asymmetric y error bar (lower) column index (0-based)
+                        for the preceding --file. If given after all files,
+                        applies to all. Default: 0 (no asymmetric error bars)
+  --dy_high COL         asymmetric y error bar (upper) column index (0-based)
+                        for the preceding --file. If given after all files,
+                        applies to all. Default: 0 (no asymmetric error bars)
   -s, --downsampling N  Load every N-th row from each file (default: 1, no downsampling)
   -l, --load FILE       Load a previously saved session (.json)
   -h, --help            Show this help message and exit
@@ -48,6 +55,9 @@ Examples:
   # specify error bars
   pygra --file data.dat --x 0 --y 1 --dy 2
 
+  # asymmetric y error bars (lower in column 2, upper in column 3)
+  pygra --file data.dat --x 0 --y 1 --dy_low 2 --dy_high 3
+
   # load every 100th row (useful for large files)
   pygra idx_*.csv --x 3 --y 4 --downsampling 100
 
@@ -60,7 +70,8 @@ def _parse_interleaved(argv: list) -> dict:
     """
     Parse the command-line argument list into a structured dict.
 
-    Supports interleaved ``--file``/``--x``/``--y``/``--dx``/``--dy`` groups so that each
+    Supports interleaved ``--file``/``--x``/``--y``/``--dx``/``--dy``/``--dy_low``/
+    ``--dy_high`` groups so that each
     ``--file`` can carry its own column specification, and also handles
     positional file arguments and trailing column options that apply
     to all files.  Prints :data:`HELP_TEXT` and exits if ``-h`` or
@@ -76,7 +87,8 @@ def _parse_interleaved(argv: list) -> dict:
     dict
         ``{"files": list[dict], "load": str | None, "downsampling": int}``
         where each file dict has keys ``"path"`` (str), ``"xcol"`` (int),
-        ``"ycol"`` (int), ``"dxcol"`` (int), and ``"dycol"`` (int).
+        ``"ycol"`` (int), ``"dxcol"`` (int), ``"dycol"`` (int),
+        ``"dy_low_col"`` (int), and ``"dy_high_col"`` (int).
     """
     if any(tok in ("-h", "--help") for tok in argv):
         print(HELP_TEXT)
@@ -85,14 +97,20 @@ def _parse_interleaved(argv: list) -> dict:
     files = []
     load = None
     downsampling = 1
-    global_cols = {"xcol": None, "ycol": None, "dxcol": None, "dycol": None}
     col_options = {
         "--x": "xcol",
         "--y": "ycol",
         "--dx": "dxcol",
         "--dy": "dycol",
+        "--dy_low": "dy_low_col",
+        "--dy_high": "dy_high_col",
     }
-    defaults = {"xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0}
+    defaults = {"xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0,
+                "dy_low_col": 0, "dy_high_col": 0}
+    global_cols = {key: None for key in defaults}
+
+    def _new_file(path: str) -> dict:
+        return {"path": path, **{key: None for key in defaults}}
 
     def _has_subsequent_file(start: int) -> bool:
         """Return True if argv[start:] contains another file argument."""
@@ -101,8 +119,7 @@ def _parse_interleaved(argv: list) -> dict:
             nxt = argv[j]
             if nxt in ("--file", "-f"):
                 return True
-            if nxt in ("--load", "-l", "--x", "--y", "--dx", "--dy",
-                       "--downsampling", "-s"):
+            if nxt in ("--load", "-l", "--downsampling", "-s") or nxt in col_options:
                 j += 2
                 continue
             if not nxt.startswith("-"):
@@ -125,15 +142,7 @@ def _parse_interleaved(argv: list) -> dict:
         elif tok in ("--file", "-f"):
             i += 1
             if i < len(argv):
-                files.append(
-                    {
-                        "path": argv[i],
-                        "xcol": None,
-                        "ycol": None,
-                        "dxcol": None,
-                        "dycol": None,
-                    }
-                )
+                files.append(_new_file(argv[i]))
         elif tok in col_options and files:
             i += 1
             try:
@@ -147,9 +156,7 @@ def _parse_interleaved(argv: list) -> dict:
                 else:
                     global_cols[key] = value
         elif not tok.startswith("-"):
-            files.append(
-                {"path": tok, "xcol": None, "ycol": None, "dxcol": None, "dycol": None}
-            )
+            files.append(_new_file(tok))
         i += 1
 
     for f in files:
@@ -210,6 +217,8 @@ def main():
             ycol=f["ycol"],
             dxcol=f["dxcol"],
             dycol=f["dycol"],
+            dy_low_col=f["dy_low_col"],
+            dy_high_col=f["dy_high_col"],
             step=args["downsampling"],
         )
 

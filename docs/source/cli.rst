@@ -20,8 +20,11 @@ Basic usage
    # per-file column specification
    pygra --file file1.dat --x 0 --y 3 --file file2.dat --x 0 --y 5
 
-   # specify error bars
-   pygra --file data.dat --x 0 --y 1 --dx 2 --dy 3
+   # specify symmetric error bars
+   pygra --file data.dat --x 0 --y 1 --dy 2
+
+   # specify asymmetric error bars (e.g. bootstrap q16/q84)
+   pygra --file data.dat --x 0 --y 1 --dy_low 2 --dy_high 3
 
    # load every 100th row (useful for very large files)
    pygra idx_*.csv --x 3 --y 4 --downsampling 100
@@ -57,6 +60,12 @@ Options
    * - ``--dy COL``
      - y error bar column index (0-based) for the preceding ``--file``.
        If given after all files, applies to all. Default: none.
+   * - ``--dy_low COL``
+     - Lower asymmetric y error bar column index (0-based) for the preceding ``--file``.
+       Use together with ``--dy_high`` for bootstrap/confidence intervals. Default: none.
+   * - ``--dy_high COL``
+     - Upper asymmetric y error bar column index (0-based) for the preceding ``--file``.
+       Use together with ``--dy_low``. Default: none.
    * - ``-s``, ``--downsampling N``
      - Load every N-th row from all files. Useful for very large files.
        Default: 1 (no downsampling).
@@ -68,9 +77,9 @@ Options
 Column assignment rules
 -----------------------
 
-- ``--x`` / ``--y`` / ``--dx`` / ``--dy`` immediately after ``--file`` apply to that specific file only
-- ``--x`` / ``--y`` / ``--dx`` / ``--dy`` after all files apply to all of them
-- Default columns: x=0, y=1, dx=0 (none), dy=0 (none)
+- ``--x`` / ``--y`` / ``--dx`` / ``--dy`` / ``--dy_low`` / ``--dy_high`` immediately after ``--file`` apply to that specific file only
+- ``--x`` / ``--y`` / ``--dx`` / ``--dy`` / ``--dy_low`` / ``--dy_high`` after all files apply to all of them
+- Default columns: x=0, y=1, dx=0 (none), dy=0 (none), dy_low=0 (none), dy_high=0 (none)
 
 Examples
 --------
@@ -82,6 +91,9 @@ Examples
 
    # all matching files, same columns and error bars
    pygra *file*.dat --x 0 --y 1 --dy 2
+
+   # asymmetric error bars from bootstrap quantiles
+   pygra data.dat --x 0 --y 1 --dy_low 2 --dy_high 3
 
    # large CSV files, load every 50th row
    pygra idx_*.csv --x 3 --y 4 -s 50

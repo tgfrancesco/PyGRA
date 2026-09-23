@@ -16,15 +16,15 @@ class TestParseInterleaved:
             ["--file", "a.dat", "--x", "0", "--y", "3", "--file", "b.dat"]
         )
         assert args["files"] == [
-            {"path": "a.dat", "xcol": 0, "ycol": 3, "dxcol": 0, "dycol": 0},
-            {"path": "b.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0},
+            {"path": "a.dat", "xcol": 0, "ycol": 3, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0},
+            {"path": "b.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0},
         ]
 
     def test_trailing_columns_apply_globally_to_positional_files(self):
         args = _parse_interleaved(["a.dat", "b.dat", "--x", "2", "--y", "4"])
         assert args["files"] == [
-            {"path": "a.dat", "xcol": 2, "ycol": 4, "dxcol": 0, "dycol": 0},
-            {"path": "b.dat", "xcol": 2, "ycol": 4, "dxcol": 0, "dycol": 0},
+            {"path": "a.dat", "xcol": 2, "ycol": 4, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0},
+            {"path": "b.dat", "xcol": 2, "ycol": 4, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0},
         ]
 
     def test_mixed_per_file_and_trailing_global_columns(self):
@@ -32,15 +32,15 @@ class TestParseInterleaved:
             ["--file", "a.dat", "--x", "1", "--file", "b.dat", "--y", "5"]
         )
         assert args["files"] == [
-            {"path": "a.dat", "xcol": 1, "ycol": 5, "dxcol": 0, "dycol": 0},
-            {"path": "b.dat", "xcol": 0, "ycol": 5, "dxcol": 0, "dycol": 0},
+            {"path": "a.dat", "xcol": 1, "ycol": 5, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0},
+            {"path": "b.dat", "xcol": 0, "ycol": 5, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0},
         ]
 
     def test_load_argument_is_preserved(self):
         args = _parse_interleaved(["--load", "session.json", "a.dat"])
         assert args["load"] == "session.json"
         assert args["files"] == [
-            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0}
+            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0}
         ]
 
     def test_per_file_error_columns_do_not_leak_to_later_files(self):
@@ -48,22 +48,60 @@ class TestParseInterleaved:
             ["--file", "a.dat", "--dx", "2", "--dy", "3", "--file", "b.dat"]
         )
         assert args["files"] == [
-            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 2, "dycol": 3},
-            {"path": "b.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0},
+            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 2, "dycol": 3, "dy_low_col": 0, "dy_high_col": 0},
+            {"path": "b.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0},
         ]
 
     def test_trailing_error_columns_apply_globally_to_positional_files(self):
         args = _parse_interleaved(["a.dat", "b.dat", "--dx", "2", "--dy", "3"])
         assert args["files"] == [
-            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 2, "dycol": 3},
-            {"path": "b.dat", "xcol": 0, "ycol": 1, "dxcol": 2, "dycol": 3},
+            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 2, "dycol": 3, "dy_low_col": 0, "dy_high_col": 0},
+            {"path": "b.dat", "xcol": 0, "ycol": 1, "dxcol": 2, "dycol": 3, "dy_low_col": 0, "dy_high_col": 0},
         ]
 
     def test_error_columns_default_to_zero(self):
         args = _parse_interleaved(["a.dat"])
         assert args["files"] == [
-            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0}
+            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0, "dy_low_col": 0, "dy_high_col": 0}
         ]
+
+    def test_per_file_asymmetric_error_columns_do_not_leak_to_later_files(self):
+        args = _parse_interleaved(
+            ["--file", "a.dat", "--dy_low", "2", "--dy_high", "3", "--file", "b.dat"]
+        )
+        assert args["files"] == [
+            {"path": "a.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0,
+             "dy_low_col": 2, "dy_high_col": 3},
+            {"path": "b.dat", "xcol": 0, "ycol": 1, "dxcol": 0, "dycol": 0,
+             "dy_low_col": 0, "dy_high_col": 0},
+        ]
+
+    def test_trailing_asymmetric_error_columns_apply_globally(self):
+        args = _parse_interleaved(
+            ["a.dat", "b.dat", "--dy_low", "2", "--dy_high", "3"]
+        )
+        for f in args["files"]:
+            assert f["dy_low_col"] == 2
+            assert f["dy_high_col"] == 3
+
+    def test_mixed_per_file_and_trailing_asymmetric_error_columns(self):
+        args = _parse_interleaved(
+            ["--file", "a.dat", "--dy_low", "4", "--file", "b.dat", "--dy_high", "5"]
+        )
+        assert [(f["dy_low_col"], f["dy_high_col"]) for f in args["files"]] == [
+            (4, 5), (0, 5),
+        ]
+
+    def test_asymmetric_error_columns_default_to_zero(self):
+        args = _parse_interleaved(["a.dat"])
+        assert args["files"][0]["dy_low_col"] == 0
+        assert args["files"][0]["dy_high_col"] == 0
+
+    def test_asymmetric_error_column_value_not_treated_as_file(self):
+        args = _parse_interleaved(
+            ["--file", "a.dat", "--dy_low", "2", "--dy_high", "3"]
+        )
+        assert [f["path"] for f in args["files"]] == ["a.dat"]
 
     def test_downsampling_default_is_one(self):
         args = _parse_interleaved(["a.dat"])

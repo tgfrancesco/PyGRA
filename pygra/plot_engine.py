@@ -166,6 +166,21 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         dx = ds.col(cfg["dxcol"]) if cfg["dxcol"] >= 0 else None
         dy = ds.col(cfg["dycol"]) if cfg["dycol"] >= 0 else None
 
+        dy_low_col  = cfg.get("dy_low_col", 0)
+        dy_high_col = cfg.get("dy_high_col", 0)
+        has_asym = (dy_low_col > 0 and dy_high_col > 0
+                    and dy_low_col < ds.ncols and dy_high_col < ds.ncols)
+        dy_low = dy_high = None
+        if has_asym:
+            dy_low  = ds.col(dy_low_col)
+            dy_high = ds.col(dy_high_col)
+            yerr = [dy_low, dy_high]
+        else:
+            yerr = dy
+
+        error_style = cfg.get("error_style", "Bars")
+        band_alpha  = cfg.get("band_alpha", 0.25)
+
         ls = cfg["linestyle"] if cfg["linestyle"] != "none" else "None"
         mk = cfg["marker"]    if cfg["marker"]    != "none" else "None"
 
@@ -177,8 +192,13 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
             markeredgecolor=cfg["color"],
             label=cfg["label"],
         )
-        if dx is not None or dy is not None:
-            err = ax.errorbar(x, y, xerr=dx, yerr=dy, capsize=3, **plot_kw)
+
+        has_err = has_asym or dy is not None or dx is not None
+        show_bars = error_style in ("Bars", "Both")
+        show_band = error_style in ("Band (fill_between)", "Both")
+
+        if has_err and show_bars:
+            err = ax.errorbar(x, y, xerr=dx, yerr=yerr, capsize=3, **plot_kw)
             # Matplotlib labels the ErrorbarContainer, but hit-testing uses
             # the inner Line2D from ax.get_lines().
             if err.lines and err.lines[0] is not None:
@@ -186,6 +206,14 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
                 err.set_label("_nolegend_")
         else:
             ax.plot(x, y, **plot_kw)
+
+        if show_band:
+            if has_asym:
+                ax.fill_between(x, y - dy_low, y + dy_high,
+                                 alpha=band_alpha, color=cfg["color"])
+            elif dy is not None:
+                ax.fill_between(x, y - dy, y + dy,
+                                 alpha=band_alpha, color=cfg["color"])
 
     # ---- fit layers ----
     for layer in fit_layers:

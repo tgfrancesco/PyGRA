@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.9.0] - 2026-07-22
+
+### Added
+- Asymmetric error bars: new `dy_low` and `dy_high` column selectors in 
+  the series panel for bootstrap/confidence intervals (e.g. q16/q84)
+- Confidence band: `fill_between` shading as alternative or complement to 
+  error bars, configurable in Appearance (style: Bars / Band / Both, alpha)
+- CLI: `--dy_low` and `--dy_high` options for asymmetric error bar columns
+- Series navigation dropdown above the tab panel for quick switching 
+  between loaded series
+- Double-click on a curve in the plot to jump to the corresponding series tab
+- Fit range selection in Fit & Interpolation: manual x min/x max or 
+  "Use zoom range" to fit only the visible region
+- Gaussian curve fit: f(x) = A·exp(-(x-μ)²/2σ²) for arbitrary (x,y) data
+- Exponential curve fit: f(x) = A·exp(-x/τ)+C for arbitrary (x,y) data
+
+### Changed
+- Distribution fits renamed for clarity: "Gaussian (distribution)", 
+  "Exponential (distribution)", "Maxwell-Boltzmann (distribution)", 
+  "Poisson (distribution)"
+- Custom fit now correctly operates on (x,y) data in Series mode and 
+  on histogram data in Histogram mode
+
 ## [0.8.3] - 2026-07-22
 
 ### Fixed

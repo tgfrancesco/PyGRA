@@ -147,8 +147,14 @@ pygra file1.dat file2.dat --x 0 --y 3
 # per-file column specification
 pygra --file file1.dat --x 0 --y 3 --file file2.dat --x 0 --y 5
 
-# specify error bars
+# specify symmetric error bars
 pygra --file data.dat --x 0 --y 1 --dy 2
+
+# specify asymmetric error bars (e.g. bootstrap q16/q84)
+pygra --file data.dat --x 0 --y 1 --dy_low 2 --dy_high 3
+
+# large files — load every 50th row
+pygra idx_*.csv --x 3 --y 4 -s 50
 
 # load a saved session
 pygra --load session.json
@@ -158,9 +164,9 @@ pygra --help
 ```
 **CLI rules:**
 - Files can be passed as positional arguments: `pygra *.dat` works as expected
-- `--x` / `--y` / `--dx` / `--dy` immediately after `--file` apply to that specific file only
-- `--x` / `--y` / `--dx` / `--dy` after all files apply to all of them
-- Default columns: x=0, y=1, dx=0 (none), dy=0 (none)
+- `--x` / `--y` / `--dx` / `--dy` / `--dy_low` / `--dy_high` immediately after `--file` apply to that specific file only
+- `--x` / `--y` / `--dx` / `--dy` / `--dy_low` / `--dy_high` after all files apply to all of them
+- Default columns: x=0, y=1, dx=0 (none), dy=0 (none), dy_low=0 (none), dy_high=0 (none)
 - `-s` / `--downsampling N` loads every N-th row from all files — useful for very large files
 
 ## File format

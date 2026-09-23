@@ -57,6 +57,8 @@ class DatasetWidget(QWidget):
             "markersize": 5.0,
             "color":      color,
             "face_color": color,
+            "error_style": "Bars",
+            "band_alpha":  0.25,
         }
         # histogram style
         self._hist_style = {
@@ -140,6 +142,12 @@ class DatasetWidget(QWidget):
         layout.addWidget(self._lbl_dx, 4, 0); layout.addWidget(self.dxcol, 4, 1)
         layout.addWidget(self._lbl_dy, 4, 2); layout.addWidget(self.dycol, 4, 3)
 
+        # asymmetric error columns (dy low, dy high)
+        self._lbl_dy_low  = QLabel("dy low:");  self.dy_low_col  = col_spin(-1)
+        self._lbl_dy_high = QLabel("dy high:"); self.dy_high_col = col_spin(-1)
+        layout.addWidget(self._lbl_dy_low,  5, 0); layout.addWidget(self.dy_low_col,  5, 1)
+        layout.addWidget(self._lbl_dy_high, 5, 2); layout.addWidget(self.dy_high_col, 5, 3)
+
         # histogram column
         self._lbl_hcol = QLabel("column:")
         self.hcol = col_spin(0)
@@ -181,7 +189,9 @@ class DatasetWidget(QWidget):
         hist   = self._rb_hist.isChecked()
         hist2d = self._rb_hist2d.isChecked()
         for w in [self._lbl_x,  self.xcol,  self._lbl_y,  self.ycol,
-                  self._lbl_dx, self.dxcol, self._lbl_dy, self.dycol]:
+                  self._lbl_dx, self.dxcol, self._lbl_dy, self.dycol,
+                  self._lbl_dy_low, self.dy_low_col,
+                  self._lbl_dy_high, self.dy_high_col]:
             w.setVisible(series)
         for w in [self._lbl_hcol, self.hcol]:
             w.setVisible(hist)
@@ -249,6 +259,7 @@ class DatasetWidget(QWidget):
         """
         nc = max(0, self.dataset.ncols - 1)
         for w in [self.xcol, self.ycol, self.dxcol, self.dycol,
+                  self.dy_low_col, self.dy_high_col,
                   self.hcol, self.xcol2, self.ycol2]:
             w.setMaximum(nc)
 
@@ -269,7 +280,8 @@ class DatasetWidget(QWidget):
         dict
             Keys always present: ``"label"`` (str), ``"visible"`` (bool),
             ``"hist_mode"`` (bool), ``"hist2d_mode"`` (bool), ``"xcol"``,
-            ``"ycol"``, ``"dxcol"``, ``"dycol"``, ``"hcol"`` (int).
+            ``"ycol"``, ``"dxcol"``, ``"dycol"``, ``"dy_low_col"``,
+            ``"dy_high_col"``, ``"hcol"`` (int).
             In hist2d mode ``"xcol"`` and ``"ycol"`` reflect the hist2d
             column spinboxes.  Additional style keys are merged from the
             active style dict.
@@ -285,6 +297,8 @@ class DatasetWidget(QWidget):
             "ycol":  self.ycol2.value() if hist2d else self.ycol.value(),
             "dxcol": self.dxcol.value(),
             "dycol": self.dycol.value(),
+            "dy_low_col":  self.dy_low_col.value(),
+            "dy_high_col": self.dy_high_col.value(),
             "hcol":  self.hcol.value(),
         }
         if hist:

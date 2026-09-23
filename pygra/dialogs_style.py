@@ -381,6 +381,17 @@ class AppearanceDialog(QDialog):
         self.face_btn.clicked.connect(lambda: self._pick("face"))
         form.addRow("Marker fill color:", self.face_btn)
 
+        # error bar / band style
+        self.error_style = QComboBox()
+        self.error_style.addItems(["Bars", "Band (fill_between)", "Both"])
+        self.error_style.setCurrentText(self._cfg.get("error_style", "Bars"))
+        form.addRow("Error style:", self.error_style)
+
+        self.band_alpha = QDoubleSpinBox()
+        self.band_alpha.setRange(0.0, 1.0); self.band_alpha.setSingleStep(0.05)
+        self.band_alpha.setValue(self._cfg.get("band_alpha", 0.25))
+        form.addRow("Band alpha:", self.band_alpha)
+
         layout.addLayout(form)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self.accept)
@@ -415,7 +426,8 @@ class AppearanceDialog(QDialog):
             Keys: ``"label"`` (str), ``"linestyle"`` (str),
             ``"linewidth"`` (float), ``"marker"`` (str),
             ``"markersize"`` (float), ``"color"`` (str),
-            ``"face_color"`` (str).
+            ``"face_color"`` (str), ``"error_style"`` (str),
+            ``"band_alpha"`` (float).
         """
         return {
             "label":      self.label_edit.text(),
@@ -425,6 +437,8 @@ class AppearanceDialog(QDialog):
             "markersize": self.markersize.value(),
             "color":      self._color,
             "face_color": self._face_color,
+            "error_style": self.error_style.currentText(),
+            "band_alpha":  self.band_alpha.value(),
         }
 
 

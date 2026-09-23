@@ -719,7 +719,8 @@ class MainWindow(QMainWindow):
             self._load_file(path)
 
     def _load_file(self, path: str, xcol: int = 0, ycol: int = 1,
-                   dxcol: int = 0, dycol: int = 0, step: int = 1):
+                   dxcol: int = 0, dycol: int = 0, dy_low_col: int = 0,
+                   dy_high_col: int = 0, step: int = 1):
         try:
             ds = DataSet(path, step=step)
             if ds.skipped_rows:
@@ -743,6 +744,8 @@ class MainWindow(QMainWindow):
             if ycol != 1 and ycol < ds.ncols: dw.ycol.setValue(ycol)
             if dxcol > 0 and dxcol < ds.ncols: dw.dxcol.setValue(dxcol)
             if dycol > 0 and dycol < ds.ncols: dw.dycol.setValue(dycol)
+            if dy_low_col > 0 and dy_low_col < ds.ncols: dw.dy_low_col.setValue(dy_low_col)
+            if dy_high_col > 0 and dy_high_col < ds.ncols: dw.dy_high_col.setValue(dy_high_col)
             return dw
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not load {path}:\n{e}")
