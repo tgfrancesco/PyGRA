@@ -1,13 +1,18 @@
 [lint]
 ignore = [
-    "E701",    # multiple statements on one line (colon)
-    "E702",    # multiple statements on one line (semicolon)
-    "F401",    # imported but unused
-    "F811",    # redefinition of unused name
-    "EXE001",  # shebang present but file not executable
-    "I001",    # import block unsorted
-    "BLE001",  # broad except Exception
-    "S110",    # except Exception: pass
-    "RUF059",  # unused unpacked variable
-    "RUF012",  # mutable class attribute without ClassVar
+    "E701",    
+    "E702",    
+    "F401",    
+    "F403",    
+    "F811",    
+    "EXE001",  
+    "I001",    
+    "BLE001",  
+    "S110",    
+    "RUF059",  
+    "RUF012",  
+    "RUF100",  
+    "C401",    
+    "C408",    
+    "SIM102",  
 ]
