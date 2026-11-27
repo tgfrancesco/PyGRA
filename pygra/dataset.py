@@ -227,6 +227,10 @@ def apply_transform(dataset: DataSet, cfg: dict) -> np.ndarray:
     if cfg.get("new_col", True):
         dataset.arr = np.column_stack([dataset.arr, result])
     else:
-        dataset.arr[:, cfg["col"]] = result
+        # assign a new array rather than writing in place, so undo
+        # snapshots holding the previous array stay valid
+        new_arr = dataset.arr.copy()
+        new_arr[:, cfg["col"]] = result
+        dataset.arr = new_arr
 
     return result

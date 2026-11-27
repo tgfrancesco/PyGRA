@@ -2,6 +2,7 @@
 mainwindow.py — MainWindow with menu bar, fit layer management, custom toolbar
 """
 
+import copy
 import sys
 
 import numpy as np
@@ -36,6 +37,7 @@ from .widgets import DatasetWidget
 from .state import save_state, load_state
 from .preferences import load_prefs, save_prefs, PREFS_PATH
 from .plot_engine import render_plot
+from .history import History
 
 
 class FitLayer:
@@ -184,6 +186,8 @@ class MainWindow(QMainWindow):
         self._dragging_annot_idx: int = -1
         self._palette_actions: dict = {}
         self._syncing_series_nav = False
+        self._history = History()
+        self._restoring = False                # True while _restore() runs
         self._build_ui()
         self._build_menu()
         self._restore_geometry()
@@ -1275,6 +1279,129 @@ class MainWindow(QMainWindow):
         cfg["y"] = 0.5
         self._annotations.append(cfg)
         self._plot()
+
+    # ------------------------------------------------------------------
+    # Undo / redo snapshots
+    # ------------------------------------------------------------------
+
+    def _push_history(self):
+        """Record the current state as an undo step (no-op during restore)."""
+        if self._restoring:
+            return
+        self._history.push(self._snapshot())
+
+    def _snapshot(self) -> dict:
+        """
+        Capture all user-editable state.
+
+        Dataset arrays are not copied: each series keeps a reference to
+        its :class:`DataSet` and to the ``arr`` it had at snapshot time.
+        This relies on transforms and data edits assigning a new array to
+        ``ds.arr`` instead of modifying it in place.  Fit-layer arrays are
+        likewise kept by reference, since they are never modified.
+        """
+        series = []
+        for i, dw in enumerate(self.dataset_widgets):
+            if dw._rb_hist2d.isChecked():
+                mode = "hist2d"
+            elif dw._rb_hist.isChecked():
+                mode = "histogram"
+            else:
+                mode = "series"
+            series.append({
+                "dataset":      dw.dataset,
+                "arr":          dw.dataset.arr,
+                "tab_name":     self.datasets_tab.tabText(i),
+                "mode":         mode,
+                "visible":      dw.visible.isChecked(),
+                "columns": {
+                    "xcol":  dw.xcol.value(),  "ycol":  dw.ycol.value(),
+                    "dxcol": dw.dxcol.value(), "dycol": dw.dycol.value(),
+                    "dy_low_col":  dw.dy_low_col.value(),
+                    "dy_high_col": dw.dy_high_col.value(),
+                    "hcol":  dw.hcol.value(),
+                    "xcol2": dw.xcol2.value(), "ycol2": dw.ycol2.value(),
+                },
+                # label lives in series_style
+                "series_style": copy.deepcopy(dw._series_style),
+                "hist_style":   copy.deepcopy(dw._hist_style),
+                "hist2d_style": copy.deepcopy(dw._hist2d_style),
+                "last_fit_cfg": copy.deepcopy(getattr(dw, "_last_fit_cfg", None)),
+            })
+        return {
+            "datasets":       list(self.datasets),
+            "series":         series,
+            "current_tab":    self.datasets_tab.currentIndex(),
+            "axis_settings":  self._get_axis_settings(),
+            "style_settings": copy.deepcopy(self.style_settings),
+            "annotations":    copy.deepcopy(self._annotations),
+            "legend_pos":     self._legend_pos,
+            "fit_layers": [
+                {"label": fl.label, "x": fl.x, "y": fl.y, "color": fl.color,
+                 "source_label": fl.source_label, "linestyle": fl.linestyle,
+                 "linewidth": fl.linewidth, "visible": fl.visible}
+                for fl in self.fit_layers
+            ],
+        }
+
+    def _restore(self, snap: dict):
+        """
+        Rebuild series tabs, fit panel and plot from a :meth:`_snapshot`.
+
+        Mutable parts of *snap* are copied, so the snapshot can be restored
+        again later (e.g. undo → redo → undo).  Never pushes to the history.
+        """
+        self._restoring = True
+        try:
+            # series tabs
+            self.dataset_widgets.clear()
+            while self.datasets_tab.count():
+                w = self.datasets_tab.widget(0)
+                self.datasets_tab.removeTab(0)
+                w.deleteLater()
+            self.datasets = list(snap["datasets"])
+            for s in snap["series"]:
+                ds = s["dataset"]
+                ds.arr = s["arr"]     # before widget creation: sets spinbox ranges
+                dw = self._add_dataset_widget(ds)
+                self.datasets_tab.setTabText(self.datasets_tab.count() - 1,
+                                             s["tab_name"])
+                cols = s["columns"]
+                for name in ("xcol", "ycol", "dxcol", "dycol", "dy_low_col",
+                             "dy_high_col", "hcol", "xcol2", "ycol2"):
+                    getattr(dw, name).setValue(cols[name])
+                dw.set_mode(s["mode"])
+                dw.visible.setChecked(s["visible"])
+                for key, style in (("series_style", dw._series_style),
+                                   ("hist_style",   dw._hist_style),
+                                   ("hist2d_style", dw._hist2d_style)):
+                    style.clear()
+                    style.update(copy.deepcopy(s[key]))
+                if s["last_fit_cfg"] is not None:
+                    dw._last_fit_cfg = copy.deepcopy(s["last_fit_cfg"])
+            if 0 <= snap["current_tab"] < self.datasets_tab.count():
+                self.datasets_tab.setCurrentIndex(snap["current_tab"])
+
+            # global settings
+            self._apply_axis_settings(snap["axis_settings"])
+            self.style_settings = copy.deepcopy(snap["style_settings"])
+            self._annotations   = copy.deepcopy(snap["annotations"])
+            self._legend_pos    = snap["legend_pos"]
+
+            # fit layers
+            self.fit_layers.clear()
+            for f in snap["fit_layers"]:
+                layer = FitLayer(f["label"], f["x"], f["y"], f["color"],
+                                 f["source_label"], linestyle=f["linestyle"],
+                                 linewidth=f["linewidth"])
+                layer.visible = f["visible"]
+                self.fit_layers.append(layer)
+            self._rebuild_fit_panel()
+
+            self._refresh_series_combo()
+            self._plot()
+        finally:
+            self._restoring = False
 
     # ------------------------------------------------------------------
     # Plot
