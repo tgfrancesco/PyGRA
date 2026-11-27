@@ -41,14 +41,18 @@ flexible plotting without writing code every time.
 
    api/dataset
    api/fitting
+   api/history
    api/palettes
    api/preferences
    api/state
    api/constants
    api/main
-   api/dialogs
+   api/dialogs_style
+   api/dialogs_analysis
+   api/dialogs_misc
    api/widgets
    api/mainwindow
+   api/plot_engine
 
 .. toctree::
    :maxdepth: 1

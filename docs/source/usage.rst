@@ -49,6 +49,12 @@ Menu bar
    * - File
      - Export active data
      - —
+   * - Edit
+     - Undo
+     - Ctrl+Z
+   * - Edit
+     - Redo
+     - Ctrl+Shift+Z
    * - Analysis
      - Transform data
      - Ctrl+T
@@ -82,14 +88,65 @@ Menu bar
 
 Toolbar
 ~~~~~~~
-
+- **↶ ↷ Undo / Redo** — step back or forward through changes to data,
+  appearance, fits, annotations, legend position and settings
 - **🔍 Zoom** — click and drag to zoom into a region
 - **✋ Pan** — click and drag to pan the view
-- **⌂ Reset** — restore the original view
+- **⌂ Reset** — restore the original axis limits after zoom/pan
+  (does not affect data or settings)
 - **↺ Legend** — reset the legend to its automatic position
 - **✎ Text** — add a draggable text annotation to the plot
 - **Coordinate display** — x and y values under the cursor, shown in real
   time on the right side of the toolbar when hovering over the plot
+
+Undo / Redo
+~~~~~~~~~~~
+
+**Edit → Undo** (Ctrl+Z) and **Redo** (Ctrl+Shift+Z), or the ↶ ↷ toolbar
+buttons. Undo covers loading, closing and reordering series, appearance,
+mode changes, transforms, data edits, fits, annotations, legend position and
+style/axis settings. Undoing a Transform or an Edit data restores the
+previous dataset contents. Dragging the legend or an annotation counts as a
+single step.
+
+Showing/hiding a fit layer, dragging histogram percentage labels and
+changing the color palette are not part of the history.
+
+Right y-axis
+~~~~~~~~~~~~
+
+Tick **Right y-axis** in the axis settings of the left panel, then open
+**Appearance** for a series and tick **Use right y-axis**. The right axis has
+its own label, log scale and y min/max, shown only when it is enabled. The
+legend combines entries from both axes.
+
+.. note::
+   The right y-axis applies to line/scatter series. Histograms are always
+   drawn on the left axis.
+
+Error bars and confidence bands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Series mode each series can use symmetric errors (**dx**, **dy**) or
+asymmetric errors (**dy low (-)**, **dy high (+)**), given as distances from
+y, not absolute values. In **Appearance**, *Error style* chooses between
+bars, a shaded band (``fill_between``) or both, and *Band alpha* sets the
+transparency. *Z-order* decides which curve is drawn on top.
+
+Fit & Interpolation
+~~~~~~~~~~~~~~~~~~~
+
+**Analysis → Fit & Interpolation** (Ctrl+F) offers spline, linear,
+polynomial, Gaussian and Exponential curve fits, a custom formula, and
+distribution fits for histograms (Gaussian, Exponential, Maxwell-Boltzmann,
+Poisson). The fit can be restricted to a window with **x min / x max** or
+with **Use zoom range**.
+
+.. note::
+   Curve fits work on (x, y) points in Series mode. Distribution fits work
+   on the values of a histogram, so they appear as "(distribution)" in the
+   method list. The custom formula follows the mode of the series: points in
+   Series mode, histogram in Histogram mode.
 
 Plot modes
 ~~~~~~~~~~

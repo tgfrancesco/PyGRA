@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.10.0] - 2026-11-27
+
+### Added
+- Undo/Redo (Ctrl+Z / Ctrl+Shift+Z, Edit menu and toolbar buttons) for data
+  loading, closing and reordering series, appearance, transforms, data edits,
+  fits, annotations, legend position and settings. Undoing a Transform or an
+  Edit data restores the previous dataset contents
+- Right y-axis: global "Right y-axis" toggle with its own label, log scale and
+  y min/max, shown only when the right axis is enabled. Each series can be
+  assigned to the right axis from Appearance
+- Legend combines entries from both y-axes; double-clicking a curve on the
+  right axis opens its series tab
+- Z-order field in Appearance to choose which curve is drawn on top
+- Draggable series tabs: the tab order sets the plot and legend order
+- Tooltips on all toolbar buttons
+
+### Fixed
+- Session save/load: series, histogram and 2D histogram styles are now saved
+  separately, so switching mode no longer loses the other styles
+- Session load: `dy_low`/`dy_high` columns are restored
+- Session load: 2D histogram x/y columns and the histogram column are
+  restored correctly
+- Older session files still load
+
+### Changed
+- "dy low (-)" and "dy high (+)" selectors are now clearly labelled
+- Transform now writes to a new array instead of modifying the existing one
+  in place
+- CI: expanded ruff configuration for existing code style
+
 ## [0.9.0] - 2026-07-22
 
 ### Added

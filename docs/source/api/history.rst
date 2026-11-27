@@ -1,7 +1,7 @@
-pygra.dialogs
+pygra.history
 =============
 
-.. automodule:: pygra.dialogs
+.. automodule:: pygra.history
    :members:
    :undoc-members:
    :show-inheritance:

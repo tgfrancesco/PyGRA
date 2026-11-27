@@ -48,7 +48,7 @@ def save_state(path: str, dataset_widgets: list, axis_settings: dict,
             "hist2d_style": dict(getattr(dw, "_hist2d_style", {})),
         })
     state = {
-        "version":        "0.9.0",
+        "version":        "0.10.0",
         "series":         series,
         "axis_settings":  axis_settings,
         "style_settings": style_settings,
@@ -76,7 +76,7 @@ def load_state(path: str) -> dict:
         State dictionary with keys ``"version"``, ``"series"``,
         ``"axis_settings"``, ``"style_settings"``, and ``"annotations"``.
         Each series entry has ``"config"`` and, for sessions saved by
-        v0.9.0 or later, ``"series_style"``, ``"hist_style"``, and
+        v0.10.0 or later, ``"series_style"``, ``"hist_style"``, and
         ``"hist2d_style"``.  The ``"data"``
         value inside each series entry is a 2-D ``numpy.ndarray``.
 
