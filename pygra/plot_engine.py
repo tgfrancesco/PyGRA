@@ -14,7 +14,7 @@ from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 
 def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
                 style_settings, axis_settings, legend_pos,
-                pct_label_positions):
+                pct_label_positions, ax2=None):
     """
     Render all series, fits, axes, legend, and text annotations onto *ax*.
 
@@ -41,6 +41,8 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         Keys: ``"xl"`` (x-label str), ``"yl"`` (y-label str),
         ``"title"`` (str), ``"logx"`` (bool), ``"logy"`` (bool),
         ``"xmin"``, ``"xmax"``, ``"ymin"``, ``"ymax"`` (str, may be "").
+        Optional ``"right_yaxis"`` (bool), ``"right_ylabel"`` (str),
+        ``"logy_right"`` (bool), ``"ymin_right"``, ``"ymax_right"`` (str).
     legend_pos : tuple or None
         ``(x, y)`` in axes-fraction coordinates for a dragged legend, or
         ``None`` to use the matplotlib ``loc`` setting.
@@ -48,6 +50,11 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         Mutable list of ``(x, y)`` tuples (or ``None``) for dragged
         percentage labels.  The list is extended in-place as new labels
         are created.
+    ax2 : matplotlib.axes.Axes or None
+        Secondary (right) y-axis sharing *ax*'s x-axis.  If ``None`` and
+        ``axis_settings["right_yaxis"]`` is true, one is created with
+        ``ax.twinx()``.  Series whose config has ``"use_right_yaxis"``
+        set are drawn on it.
 
     Returns
     -------
@@ -55,11 +62,22 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         ``"legend"``         — the :class:`~matplotlib.legend.Legend` or ``None``
         ``"pct_texts"``      — list of :class:`~matplotlib.text.Text` artists
         ``"annot_artists"``  — list of :class:`~matplotlib.text.Text` artists
+        ``"ax2"``            — the right y-axis, or ``None``
     """
     ss = style_settings
     pct_texts     = []
     annot_artists = []
     legend        = None
+
+    if ax2 is None and axis_settings.get("right_yaxis", False):
+        ax2 = ax.twinx()
+    if ax2 is not None:
+        # draw ax above ax2 so the combined legend (and mouse events) stay
+        # on the primary axes; ax2 takes over the background patch
+        ax2.patch.set_visible(True)
+        ax2.patch.set_facecolor(ax.patch.get_facecolor())
+        ax.patch.set_visible(False)
+        ax.set_zorder(ax2.get_zorder() + 1)
 
     # ---- series ----
     for dw in dataset_widgets:
@@ -67,6 +85,8 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         if not cfg["visible"]:
             continue
         ds = dw.dataset
+        use_right = cfg.get("use_right_yaxis", False)
+        target_ax = ax2 if (ax2 is not None and use_right) else ax
 
         # histogram (1D)
         if cfg["hist_mode"]:
@@ -85,16 +105,16 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
                 counts = counts / counts.sum()
                 widths = np.diff(edges)
                 if horizontal:
-                    bars = ax.barh(edges[:-1], counts, height=widths,
-                                   align="edge", **plot_kw)
+                    bars = target_ax.barh(edges[:-1], counts, height=widths,
+                                          align="edge", **plot_kw)
                 else:
-                    bars = ax.bar(edges[:-1], counts, width=widths,
-                                  align="edge", **plot_kw)
+                    bars = target_ax.bar(edges[:-1], counts, width=widths,
+                                         align="edge", **plot_kw)
                 patches   = list(bars)
                 bar_vals  = [p.get_width() if horizontal else p.get_height()
                              for p in patches]
             else:
-                n, _, patches = ax.hist(
+                n, _, patches = target_ax.hist(
                     data, bins=bins, density=(norm == "density"),
                     orientation="horizontal" if horizontal else "vertical",
                     **plot_kw)
@@ -130,9 +150,9 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
                         if idx >= len(pct_label_positions):
                             pct_label_positions.append(None)
                     _pct_fw = "bold" if ss.get("pct_bold", False) else "normal"
-                    txt = ax.text(tx, ty, f"{pct:.1f}%",
-                                  ha=ha, va=va, fontsize=pct_fs,
-                                  fontweight=_pct_fw, clip_on=False)
+                    txt = target_ax.text(tx, ty, f"{pct:.1f}%",
+                                         ha=ha, va=va, fontsize=pct_fs,
+                                         fontweight=_pct_fw, clip_on=False)
                     pct_texts.append(txt)
             continue
 
@@ -150,12 +170,12 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
             if cfg.get("log_scale", False):
                 from matplotlib.colors import LogNorm
                 norm_val = LogNorm()
-            h = ax.hist2d(x_data, y_data, bins=(bx, by),
-                          cmap=cfg.get("colormap", "viridis"),
-                          norm=norm_val,
-                          density=(cfg.get("norm", "count") == "density"))
+            h = target_ax.hist2d(x_data, y_data, bins=(bx, by),
+                                 cmap=cfg.get("colormap", "viridis"),
+                                 norm=norm_val,
+                                 density=(cfg.get("norm", "count") == "density"))
             if cfg.get("colorbar", True):
-                fig.colorbar(h[3], ax=ax)
+                fig.colorbar(h[3], ax=target_ax)
             continue
 
         # xy plot
@@ -199,22 +219,22 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         show_band = error_style in ("Band (fill_between)", "Both")
 
         if has_err and show_bars:
-            err = ax.errorbar(x, y, xerr=dx, yerr=yerr, capsize=3, **plot_kw)
+            err = target_ax.errorbar(x, y, xerr=dx, yerr=yerr, capsize=3, **plot_kw)
             # Matplotlib labels the ErrorbarContainer, but hit-testing uses
             # the inner Line2D from ax.get_lines().
             if err.lines and err.lines[0] is not None:
                 err.lines[0].set_label(cfg["label"])
                 err.set_label("_nolegend_")
         else:
-            ax.plot(x, y, **plot_kw)
+            target_ax.plot(x, y, **plot_kw)
 
         if show_band:
             if has_asym:
-                ax.fill_between(x, y - dy_low, y + dy_high,
-                                 alpha=band_alpha, color=cfg["color"])
+                target_ax.fill_between(x, y - dy_low, y + dy_high,
+                                       alpha=band_alpha, color=cfg["color"])
             elif dy is not None:
-                ax.fill_between(x, y - dy, y + dy,
-                                 alpha=band_alpha, color=cfg["color"])
+                target_ax.fill_between(x, y - dy, y + dy,
+                                       alpha=band_alpha, color=cfg["color"])
 
     # ---- fit layers ----
     for layer in fit_layers:
@@ -236,10 +256,16 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
     if axis_settings.get("xl"):    ax.set_xlabel(axis_settings["xl"],    fontsize=ss["label_fs"], fontweight=_lbl_fw)
     if axis_settings.get("yl"):    ax.set_ylabel(axis_settings["yl"],    fontsize=ss["label_fs"], fontweight=_lbl_fw)
     if axis_settings.get("title"): ax.set_title(axis_settings["title"],  fontsize=ss["title_fs"], fontweight=_title_fw)
+    if ax2 is not None and axis_settings.get("right_ylabel"):
+        ax2.set_ylabel(axis_settings["right_ylabel"], fontsize=ss["label_fs"], fontweight=_lbl_fw)
 
     ax.tick_params(labelsize=ss["tick_fs"])
     for lbl in ax.get_xticklabels() + ax.get_yticklabels():
         lbl.set_fontweight(_tick_fw)
+    if ax2 is not None:
+        ax2.tick_params(labelsize=ss["tick_fs"])
+        for lbl in ax2.get_yticklabels():
+            lbl.set_fontweight(_tick_fw)
 
     def _parse(s):
         try:   return float(s)
@@ -251,6 +277,13 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
     ymax = _parse(axis_settings.get("ymax"))
     if xmin is not None or xmax is not None: ax.set_xlim(left=xmin, right=xmax)
     if ymin is not None or ymax is not None: ax.set_ylim(bottom=ymin, top=ymax)
+
+    if ax2 is not None:
+        if axis_settings.get("logy_right"): ax2.set_yscale("log")
+        ymin_r = _parse(axis_settings.get("ymin_right"))
+        ymax_r = _parse(axis_settings.get("ymax_right"))
+        if ymin_r is not None or ymax_r is not None:
+            ax2.set_ylim(bottom=ymin_r, top=ymax_r)
 
     if ss["major_x"] > 0: ax.xaxis.set_major_locator(MultipleLocator(ss["major_x"]))
     if ss["major_y"] > 0: ax.yaxis.set_major_locator(MultipleLocator(ss["major_y"]))
@@ -267,8 +300,11 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         (any(dw.get_config()["label"] for dw in dataset_widgets) or fit_layers)
         and not all_hist2d
     )
-    _, _labels = ax.get_legend_handles_labels()
-    has_legend = has_legend and any(_labels)
+    handles1, labels1 = ax.get_legend_handles_labels()
+    handles2, labels2 = (ax2.get_legend_handles_labels() if ax2 is not None
+                         else ([], []))
+    handles, labels = handles1 + handles2, labels1 + labels2
+    has_legend = has_legend and any(labels)
     if ss.get("legend_show", True) and has_legend:
         leg_kw = dict(
             fontsize=ss["legend_fs"],
@@ -280,7 +316,7 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
             from matplotlib.font_manager import FontProperties
             leg_kw["prop"] = FontProperties(weight="bold", size=ss["legend_fs"])
         alpha = ss.get("legend_alpha", 1.0)
-        leg = ax.legend(loc=ss.get("legend_loc", "best"), **leg_kw)
+        leg = ax.legend(handles, labels, loc=ss.get("legend_loc", "best"), **leg_kw)
         if leg:
             leg.get_frame().set_alpha(alpha)
             if legend_pos is not None:
@@ -305,4 +341,5 @@ def render_plot(fig, ax, dataset_widgets, fit_layers, annotations,
         "legend":        legend,
         "pct_texts":     pct_texts,
         "annot_artists": annot_artists,
+        "ax2":           ax2,
     }

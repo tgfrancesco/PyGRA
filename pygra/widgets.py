@@ -60,6 +60,7 @@ class DatasetWidget(QWidget):
             "error_style": "Bars",
             "band_alpha":  0.25,
             "zorder":      2,
+            "use_right_yaxis": False,
         }
         # histogram style
         self._hist_style = {

@@ -374,6 +374,13 @@ class MainWindow(QMainWindow):
         ag.addWidget(QLabel("x max:"), 5, 0); self.xmax = QLineEdit(); self.xmax.setPlaceholderText("auto"); ag.addWidget(self.xmax, 5, 1)
         ag.addWidget(QLabel("y min:"), 6, 0); self.ymin = QLineEdit(); self.ymin.setPlaceholderText("auto"); ag.addWidget(self.ymin, 6, 1)
         ag.addWidget(QLabel("y max:"), 7, 0); self.ymax = QLineEdit(); self.ymax.setPlaceholderText("auto"); ag.addWidget(self.ymax, 7, 1)
+        self.right_yaxis = QCheckBox("Right y-axis"); ag.addWidget(self.right_yaxis, 8, 0, 1, 2)
+        self._right_ylabel_lbl = QLabel("Right y label:"); ag.addWidget(self._right_ylabel_lbl, 9, 0); self.right_ylabel = QLineEdit(); ag.addWidget(self.right_ylabel, 9, 1)
+        self.logy_right = QCheckBox("Log y right"); ag.addWidget(self.logy_right, 10, 0, 1, 2)
+        self._ymin_right_lbl = QLabel("y min right:"); ag.addWidget(self._ymin_right_lbl, 11, 0); self.ymin_right_edit = QLineEdit(); self.ymin_right_edit.setPlaceholderText("auto"); ag.addWidget(self.ymin_right_edit, 11, 1)
+        self._ymax_right_lbl = QLabel("y max right:"); ag.addWidget(self._ymax_right_lbl, 12, 0); self.ymax_right_edit = QLineEdit(); self.ymax_right_edit.setPlaceholderText("auto"); ag.addWidget(self.ymax_right_edit, 12, 1)
+        self.right_yaxis.toggled.connect(self._toggle_right_yaxis_controls)
+        self._toggle_right_yaxis_controls(False)
         lv.addWidget(axis_group)
 
         # plot button
@@ -622,9 +629,10 @@ class MainWindow(QMainWindow):
 
     def _activate_tab_for_clicked_curve(self, ax, event) -> bool:
         """Switch to the series tab for a double-clicked plot line."""
-        if event.inaxes is not ax:
+        if event.inaxes is None or event.inaxes not in self.fig.axes:
             return False
-        for line in ax.get_lines():
+        lines = [ln for a in self.fig.axes for ln in a.get_lines()]
+        for line in lines:
             old_pickradius = None
             try:
                 old_pickradius = line.get_pickradius()
@@ -1152,6 +1160,11 @@ class MainWindow(QMainWindow):
             "logx": self.logx.isChecked(), "logy": self.logy.isChecked(),
             "xmin": self.xmin.text(), "xmax": self.xmax.text(),
             "ymin": self.ymin.text(), "ymax": self.ymax.text(),
+            "right_yaxis": self.right_yaxis.isChecked(),
+            "right_ylabel": self.right_ylabel.text(),
+            "logy_right": self.logy_right.isChecked(),
+            "ymin_right": self.ymin_right_edit.text(),
+            "ymax_right": self.ymax_right_edit.text(),
         }
 
     def _apply_axis_settings(self, s: dict):
@@ -1162,6 +1175,21 @@ class MainWindow(QMainWindow):
         self.logy.setChecked(s.get("logy", False))
         self.xmin.setText(s.get("xmin", "")); self.xmax.setText(s.get("xmax", ""))
         self.ymin.setText(s.get("ymin", "")); self.ymax.setText(s.get("ymax", ""))
+        self.right_yaxis.setChecked(s.get("right_yaxis", False))
+        self.right_ylabel.setText(s.get("right_ylabel", ""))
+        self.logy_right.setChecked(s.get("logy_right", False))
+        self.ymin_right_edit.setText(s.get("ymin_right", ""))
+        self.ymax_right_edit.setText(s.get("ymax_right", ""))
+        # toggled only fires on a change, so sync visibility explicitly
+        self._toggle_right_yaxis_controls(self.right_yaxis.isChecked())
+
+    def _toggle_right_yaxis_controls(self, checked: bool):
+        """Show the right y-axis controls only when the right axis is enabled."""
+        for widget in (self._right_ylabel_lbl, self.right_ylabel,
+                       self.logy_right,
+                       self._ymin_right_lbl, self.ymin_right_edit,
+                       self._ymax_right_lbl, self.ymax_right_edit):
+            widget.setVisible(checked)
 
     def _save_state(self):
         path, _ = QFileDialog.getSaveFileName(

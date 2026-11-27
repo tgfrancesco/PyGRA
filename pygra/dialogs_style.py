@@ -396,6 +396,10 @@ class AppearanceDialog(QDialog):
         self.zorder.setValue(self._cfg.get("zorder", 2))
         form.addRow("Z-order:", self.zorder)
 
+        self.use_right_yaxis = QCheckBox("Use right y-axis")
+        self.use_right_yaxis.setChecked(self._cfg.get("use_right_yaxis", False))
+        form.addRow("", self.use_right_yaxis)
+
         layout.addLayout(form)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self.accept)
@@ -431,7 +435,8 @@ class AppearanceDialog(QDialog):
             ``"linewidth"`` (float), ``"marker"`` (str),
             ``"markersize"`` (float), ``"color"`` (str),
             ``"face_color"`` (str), ``"error_style"`` (str),
-            ``"band_alpha"`` (float), ``"zorder"`` (int).
+            ``"band_alpha"`` (float), ``"zorder"`` (int),
+            ``"use_right_yaxis"`` (bool).
         """
         return {
             "label":      self.label_edit.text(),
@@ -444,6 +449,7 @@ class AppearanceDialog(QDialog):
             "error_style": self.error_style.currentText(),
             "band_alpha":  self.band_alpha.value(),
             "zorder":      self.zorder.value(),
+            "use_right_yaxis": self.use_right_yaxis.isChecked(),
         }
 
 
