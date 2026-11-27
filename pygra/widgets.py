@@ -42,11 +42,14 @@ class DatasetWidget(QWidget):
     """
 
     def __init__(self, dataset, color: str, on_duplicate=None,
-                 on_replot=None, parent=None):
+                 on_replot=None, on_before_change=None, parent=None):
         super().__init__(parent)
         self.dataset      = dataset
         self.on_duplicate = on_duplicate
         self.on_replot    = on_replot   # callable: triggers a full replot
+        # callable: called right before a user change (undo snapshot)
+        self.on_before_change = on_before_change
+        self._mode = "series"
 
         # series style
         self._series_style = {
@@ -123,7 +126,7 @@ class DatasetWidget(QWidget):
         rb_layout.addWidget(self._rb_hist)
         rb_layout.addWidget(self._rb_hist2d)
         layout.addWidget(rb_widget, 2, 0, 1, 4)
-        self._mode_group.buttonClicked.connect(lambda _: self._toggle_mode())
+        self._mode_group.buttonClicked.connect(lambda _: self._on_mode_clicked())
 
         def col_spin(default):
             s = QSpinBox()
@@ -145,8 +148,14 @@ class DatasetWidget(QWidget):
         layout.addWidget(self._lbl_dy, 4, 2); layout.addWidget(self.dycol, 4, 3)
 
         # asymmetric error columns (dy low, dy high)
-        self._lbl_dy_low  = QLabel("dy low:");  self.dy_low_col  = col_spin(-1)
-        self._lbl_dy_high = QLabel("dy high:"); self.dy_high_col = col_spin(-1)
+        self._lbl_dy_low  = QLabel("dy low (-):");  self.dy_low_col  = col_spin(-1)
+        self._lbl_dy_high = QLabel("dy high (+):"); self.dy_high_col = col_spin(-1)
+        for w in (self._lbl_dy_low, self.dy_low_col):
+            w.setToolTip("Column with the lower error, as distance from y "
+                         "(not absolute values)")
+        for w in (self._lbl_dy_high, self.dy_high_col):
+            w.setToolTip("Column with the upper error, as distance from y "
+                         "(not absolute values)")
         layout.addWidget(self._lbl_dy_low,  5, 0); layout.addWidget(self.dy_low_col,  5, 1)
         layout.addWidget(self._lbl_dy_high, 5, 2); layout.addWidget(self.dy_high_col, 5, 3)
 
@@ -186,7 +195,28 @@ class DatasetWidget(QWidget):
     # Mode switching
     # ------------------------------------------------------------------
 
+    def _checked_mode(self) -> str:
+        if self._rb_hist.isChecked():
+            return "histogram"
+        if self._rb_hist2d.isChecked():
+            return "hist2d"
+        return "series"
+
+    def mode(self) -> str:
+        """Return the applied display mode: ``"series"``, ``"histogram"`` or ``"hist2d"``."""
+        return self._mode
+
+    def _on_mode_clicked(self):
+        if self._checked_mode() != self._mode and self.on_before_change:
+            self.on_before_change()
+        self._toggle_mode()
+
+    def _before_change(self):
+        if self.on_before_change:
+            self.on_before_change()
+
     def _toggle_mode(self):
+        self._mode = self._checked_mode()
         series = self._rb_series.isChecked()
         hist   = self._rb_hist.isChecked()
         hist2d = self._rb_hist2d.isChecked()
@@ -226,6 +256,7 @@ class DatasetWidget(QWidget):
             cfg = dict(self._hist_style)
             dlg = HistAppearanceDialog(cfg, self)
             if dlg.exec_():
+                self._before_change()
                 self._hist_style.update(dlg.get_config())
                 if self.on_replot:
                     self.on_replot()
@@ -233,6 +264,7 @@ class DatasetWidget(QWidget):
             cfg = dict(self._hist2d_style)
             dlg = Hist2DAppearanceDialog(cfg, self)
             if dlg.exec_():
+                self._before_change()
                 self._hist2d_style.update(dlg.get_config())
                 if self.on_replot:
                     self.on_replot()
@@ -240,6 +272,7 @@ class DatasetWidget(QWidget):
             cfg = dict(self._series_style)
             dlg = AppearanceDialog(cfg, self)
             if dlg.exec_():
+                self._before_change()
                 self._series_style.update(dlg.get_config())
                 if self.on_replot:
                     self.on_replot()

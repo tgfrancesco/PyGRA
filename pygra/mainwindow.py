@@ -37,7 +37,7 @@ from .widgets import DatasetWidget
 from .state import save_state, load_state
 from .preferences import load_prefs, save_prefs, PREFS_PATH
 from .plot_engine import render_plot
-from .history import History
+from .history import History, snapshot_datasets, restore_datasets, clamp_column
 
 
 class FitLayer:
@@ -188,9 +188,15 @@ class MainWindow(QMainWindow):
         self._syncing_series_nav = False
         self._history = History()
         self._restoring = False                # True while _restore() runs
+        self._pending_snap = None              # pre-drag snapshot, pushed on release
+        self._drag_moved = False
+        self._legend_press_pos = None
+        self._last_axis_settings: dict = {}
         self._build_ui()
         self._build_menu()
         self._restore_geometry()
+        self._last_axis_settings = self._get_axis_settings()
+        self._update_undo_actions()
 
     # ------------------------------------------------------------------
     # Menu bar
@@ -206,6 +212,10 @@ class MainWindow(QMainWindow):
         self._act(file_menu, "Save figure...",     "Ctrl+E", self._save_figure)
         file_menu.addSeparator()
         self._act(file_menu, "Export active data...", None,  self._export_active)
+
+        edit_menu = mb.addMenu("Edit")
+        self._undo_act = self._act(edit_menu, "Undo", "Ctrl+Z",       self._undo)
+        self._redo_act = self._act(edit_menu, "Redo", "Ctrl+Shift+Z", self._redo)
 
         analysis_menu = mb.addMenu("Analysis")
         self._act(analysis_menu, "Transform data...",        "Ctrl+T", self._transform_active)
@@ -250,7 +260,7 @@ class MainWindow(QMainWindow):
         # plot shortcut (also triggered by the Plot button)
         from PyQt5.QtWidgets import QShortcut
         from PyQt5.QtGui import QKeySequence
-        QShortcut(QKeySequence("Ctrl+Return"), self).activated.connect(self._plot)
+        QShortcut(QKeySequence("Ctrl+Return"), self).activated.connect(self._on_plot_requested)
 
     def _open_docs(self):
         QDesktopServices.openUrl(QUrl("https://pygra.readthedocs.io"))
@@ -310,6 +320,7 @@ class MainWindow(QMainWindow):
             a.setShortcut(shortcut)
         a.triggered.connect(slot)
         menu.addAction(a)
+        return a
 
     # ------------------------------------------------------------------
     # UI construction
@@ -346,6 +357,7 @@ class MainWindow(QMainWindow):
         self.datasets_tab.setTabsClosable(True)
         self.datasets_tab.setMovable(True)
         self.datasets_tab.tabBar().tabMoved.connect(self._on_tab_moved)
+        self.datasets_tab.tabBar().installEventFilter(self)
         self.datasets_tab.tabCloseRequested.connect(self._close_tab)
         self.datasets_tab.currentChanged.connect(self._on_datasets_tab_changed)
         lv.addWidget(self.datasets_tab, stretch=1)
@@ -391,7 +403,7 @@ class MainWindow(QMainWindow):
         plot_btn = QPushButton("Plot")
         plot_btn.setFixedHeight(38)
         font = plot_btn.font(); font.setBold(True); plot_btn.setFont(font)
-        plot_btn.clicked.connect(self._plot)
+        plot_btn.clicked.connect(self._on_plot_requested)
         lv.addWidget(plot_btn)
 
         splitter.addWidget(left)
@@ -409,9 +421,30 @@ class MainWindow(QMainWindow):
         self._nav.hide()   # hidden: we drive it through our own buttons
 
         tb_row = QHBoxLayout(); tb_row.setSpacing(4); tb_row.setContentsMargins(4, 4, 4, 0)
+        self._undo_btn = QPushButton("↶")
+        self._undo_btn.setToolTip("Undo (Ctrl+Z)")
+        self._redo_btn = QPushButton("↷")
+        self._redo_btn.setToolTip("Redo (Ctrl+Shift+Z)")
+        for b in [self._undo_btn, self._redo_btn]:
+            b.setFixedSize(34, 28)
+            b.setEnabled(False)
+            tb_row.addWidget(b)
+        self._undo_btn.clicked.connect(self._undo)
+        self._redo_btn.clicked.connect(self._redo)
+        _sep = QFrame()
+        _sep.setFrameShape(QFrame.VLine)
+        _sep.setFrameShadow(QFrame.Sunken)
+        _sep.setFixedHeight(22)
+        tb_row.addWidget(_sep)
+
         self._zoom_btn = QPushButton("🔍 Zoom")
         self._pan_btn  = QPushButton("✋ Pan")
         self._home_btn = QPushButton("⌂ Reset")
+        self._zoom_btn.setToolTip("Zoom: drag a rectangle on the plot")
+        self._pan_btn.setToolTip("Pan: drag to move the view")
+        self._home_btn.setToolTip(
+            "Reset view: restore the original axis limits after zoom/pan\n"
+            "(does not affect data or settings)")
         self._zoom_btn.setCheckable(True)
         self._pan_btn.setCheckable(True)
         for b in [self._zoom_btn, self._pan_btn, self._home_btn]:
@@ -438,15 +471,15 @@ class MainWindow(QMainWindow):
 
         self._reset_leg_btn = QPushButton("↺ Legend")
         self._reset_leg_btn.setFixedHeight(28)
-        self._reset_leg_btn.setToolTip("Reset legend to automatic position")
+        self._reset_leg_btn.setToolTip("Reset the legend to its automatic position")
         self._reset_leg_btn.clicked.connect(self._reset_legend_pos)
-        tb_row.insertWidget(3, self._reset_leg_btn)
+        tb_row.insertWidget(tb_row.indexOf(self._home_btn) + 1, self._reset_leg_btn)
 
         self._annot_btn = QPushButton("✎ Text")
         self._annot_btn.setFixedHeight(28)
-        self._annot_btn.setToolTip("Add text annotation")
+        self._annot_btn.setToolTip("Add a text annotation")
         self._annot_btn.clicked.connect(self._add_annotation)
-        tb_row.insertWidget(4, self._annot_btn)
+        tb_row.insertWidget(tb_row.indexOf(self._reset_leg_btn) + 1, self._annot_btn)
 
         self._zoom_btn.toggled.connect(self._toggle_zoom)
         self._pan_btn.toggled.connect(self._toggle_pan)
@@ -599,6 +632,7 @@ class MainWindow(QMainWindow):
                 from PyQt5.QtGui import QCursor
                 chosen = menu.exec_(QCursor.pos())
                 if chosen == del_act:
+                    self._push_history()
                     self._annotations.pop(i)
                     self._plot()
                 return
@@ -606,10 +640,12 @@ class MainWindow(QMainWindow):
                 dlg = TextAnnotationDialog(self._annotations[i], self)
                 if dlg.exec_():
                     cfg = dlg.get_config()
+                    self._push_history()
                     self._annotations[i].update(cfg)
                     self._plot()
                 return
             self._dragging_annot_idx = i                   # single left-click → drag
+            self._begin_drag()
             return
 
         # check percentage labels
@@ -630,6 +666,7 @@ class MainWindow(QMainWindow):
         leg = ax.get_legend()
         if leg and leg.contains(event)[0]:
             self._dragging_legend = True
+            self._begin_drag()
 
     def _activate_tab_for_clicked_curve(self, ax, event) -> bool:
         """Switch to the series tab for a double-clicked plot line."""
@@ -676,6 +713,7 @@ class MainWindow(QMainWindow):
                     txt.set_position((fx, fy))
                     self._annotations[self._dragging_annot_idx]["x"] = fx
                     self._annotations[self._dragging_annot_idx]["y"] = fy
+                    self._drag_moved = True
                     self.canvas.draw_idle()
                 except (ValueError, RuntimeError, IndexError):
                     pass
@@ -709,6 +747,7 @@ class MainWindow(QMainWindow):
         except (ValueError, RuntimeError):
             return
         self._legend_pos = (fx, fy)
+        self._drag_moved = True
         leg = ax.get_legend()
         if leg:
             leg.set_bbox_to_anchor((fx, fy), transform=ax.transAxes)
@@ -719,6 +758,27 @@ class MainWindow(QMainWindow):
         self._dragging_legend = False
         self._dragging_pct_idx = -1
         self._dragging_annot_idx = -1
+        self._end_drag()
+
+    def _begin_drag(self):
+        """Take the pre-drag snapshot; it is pushed on release if anything moved."""
+        self._pending_snap = None if self._restoring else self._snapshot()
+        self._drag_moved = False
+
+    def _end_drag(self):
+        if self._pending_snap is not None and self._drag_moved:
+            self._push_history(self._pending_snap)
+        self._pending_snap = None
+        self._drag_moved = False
+
+    def eventFilter(self, obj, event):
+        from PyQt5.QtCore import QEvent
+        if obj is self.datasets_tab.tabBar():
+            if event.type() == QEvent.MouseButtonPress:
+                self._begin_drag()
+            elif event.type() == QEvent.MouseButtonRelease:
+                self._end_drag()
+        return super().eventFilter(obj, event)
 
     # ------------------------------------------------------------------
     # File actions
@@ -729,8 +789,14 @@ class MainWindow(QMainWindow):
             self, "Open data files", "",
             "Data files (*.dat *.txt *.csv *);;All files (*)",
         )
+        if not paths:
+            return
+        snap = self._snapshot()
+        n_before = len(self.dataset_widgets)
         for path in paths:
             self._load_file(path)
+        if len(self.dataset_widgets) != n_before:
+            self._push_history(snap)
 
     def _load_file(self, path: str, xcol: int = 0, ycol: int = 1,
                    dxcol: int = 0, dycol: int = 0, dy_low_col: int = 0,
@@ -771,8 +837,9 @@ class MainWindow(QMainWindow):
         tab_name = ds.name if n == 0 else f"{ds.name} [{n + 1}]"
         dw = DatasetWidget(
             ds, color,
-            on_duplicate=self._add_dataset_widget,
+            on_duplicate=self._duplicate_series,
             on_replot=self._refresh_series_combo_and_plot,
+            on_before_change=self._push_history,
         )
         self.dataset_widgets.append(dw)
         self.datasets_tab.addTab(dw, tab_name)
@@ -780,10 +847,15 @@ class MainWindow(QMainWindow):
         self._refresh_series_combo()
         return dw
 
+    def _duplicate_series(self, ds: DataSet) -> DatasetWidget:
+        self._push_history()
+        return self._add_dataset_widget(ds)
+
     def _close_tab(self, index: int):
         """Remove a series tab and its associated data."""
         if index < 0 or index >= len(self.dataset_widgets):
             return
+        self._push_history()
         dw = self.dataset_widgets[index]
         # also remove the dataset if no other widget references it
         ds = dw.dataset
@@ -804,7 +876,13 @@ class MainWindow(QMainWindow):
 
     def _on_tab_moved(self, from_idx: int, to_idx: int):
         # keep dataset_widgets in tab order (drives plot and legend order);
-        # no replot needed — user will press Plot
+        # no replot needed — user will press Plot.
+        # A drag may emit several moves: the pre-drag snapshot taken on
+        # tab-bar press is pushed once on release (see eventFilter).
+        if self._pending_snap is not None:
+            self._drag_moved = True
+        else:
+            self._push_history()
         widget = self.dataset_widgets.pop(from_idx)
         self.dataset_widgets.insert(to_idx, widget)
         self._refresh_series_combo()
@@ -856,6 +934,7 @@ class MainWindow(QMainWindow):
     def _open_style(self):
         dlg = StyleDialog(self.style_settings, self)
         if dlg.exec_() == QDialog.Accepted:
+            self._push_history()
             self.style_settings = dlg.get_settings()
 
     # ------------------------------------------------------------------
@@ -876,8 +955,10 @@ class MainWindow(QMainWindow):
         if dlg.exec_() != QDialog.Accepted:
             return
         cfg = dlg.get_config()
+        snap = self._snapshot()
         try:
             apply_transform(dw.dataset, cfg)
+            self._push_history(snap)
             dw.refresh_col_ranges()
             msg = (f"New column {dw.dataset.ncols - 1} added."
                    if cfg["new_col"] else f"Column {cfg['col']} updated.")
@@ -895,9 +976,13 @@ class MainWindow(QMainWindow):
         dw = self._active_widget()
         if not dw:
             return
+        snap = self._snapshot()      # the dialog writes ds.arr before accept()
         dlg = DataEditorDialog(dw.dataset, self)
         if dlg.exec_() == QDialog.Accepted:
-            dw.refresh_col_ranges()
+            self._push_history(snap)
+            for w in self.dataset_widgets:
+                if w.dataset is dw.dataset:
+                    w.refresh_col_ranges()
             self._plot()
 
     def _fit_active(self):
@@ -1051,6 +1136,7 @@ class MainWindow(QMainWindow):
                 color=color,
                 source_label=cfg["label"] or dw.dataset.name,
             )
+            self._push_history()
             self.fit_layers.append(layer)
             self._add_fit_layer_widget(layer)
             self._plot()
@@ -1074,6 +1160,7 @@ class MainWindow(QMainWindow):
         self._fit_layout.insertWidget(count - 1, w)
 
     def _remove_fit_layer(self, layer: FitLayer):
+        self._push_history()
         self.fit_layers.remove(layer)
         # rebuild fit panel
         self._rebuild_fit_panel()
@@ -1136,6 +1223,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(btns)
 
         if dlg.exec_() == QDialog.Accepted:
+            self._push_history()
             layer.label     = label_edit.text()
             layer.linestyle = LINESTYLES[ls_combo.currentIndex()]
             layer.linewidth = lw_spin.value()
@@ -1267,6 +1355,7 @@ class MainWindow(QMainWindow):
         self._apply_axis_settings(state.get("axis_settings", {}))
         self.style_settings = state.get("style_settings", dict(DEFAULT_STYLE_SETTINGS))
         self._annotations = state.get("annotations", [])
+        self._last_axis_settings = self._get_axis_settings()
         self._refresh_series_combo()
 
     def _add_annotation(self):
@@ -1277,6 +1366,7 @@ class MainWindow(QMainWindow):
         cfg = dlg.get_config()
         cfg["x"] = 0.5
         cfg["y"] = 0.5
+        self._push_history()
         self._annotations.append(cfg)
         self._plot()
 
@@ -1284,35 +1374,69 @@ class MainWindow(QMainWindow):
     # Undo / redo snapshots
     # ------------------------------------------------------------------
 
-    def _push_history(self):
-        """Record the current state as an undo step (no-op during restore)."""
+    def _push_history(self, snap: "dict | None" = None):
+        """
+        Record an undo step (no-op during restore).
+
+        *snap* defaults to the current state; pass a snapshot taken
+        earlier when the change has already been applied (drags, dialogs
+        that write the data before closing).
+        """
         if self._restoring:
             return
-        self._history.push(self._snapshot())
+        self._history.push(self._snapshot() if snap is None else snap)
+        self._update_undo_actions()
+
+    def _update_undo_actions(self):
+        if hasattr(self, "_undo_act"):
+            self._undo_act.setEnabled(self._history.can_undo())
+            self._redo_act.setEnabled(self._history.can_redo())
+        if hasattr(self, "_undo_btn"):
+            self._undo_btn.setEnabled(self._history.can_undo())
+            self._redo_btn.setEnabled(self._history.can_redo())
+
+    def _undo(self):
+        snap = self._history.undo(self._snapshot())
+        if snap is not None:
+            self._restore(snap)
+        self._update_undo_actions()
+
+    def _redo(self):
+        snap = self._history.redo(self._snapshot())
+        if snap is not None:
+            self._restore(snap)
+        self._update_undo_actions()
+
+    def _on_plot_requested(self):
+        """Plot button / Ctrl+Return: record axis-setting edits as one undo step."""
+        current = self._get_axis_settings()
+        if current != self._last_axis_settings and not self._restoring:
+            snap = self._snapshot()
+            snap["axis_settings"] = dict(self._last_axis_settings)
+            self._push_history(snap)
+        self._plot()
 
     def _snapshot(self) -> dict:
         """
         Capture all user-editable state.
 
-        Dataset arrays are not copied: each series keeps a reference to
-        its :class:`DataSet` and to the ``arr`` it had at snapshot time.
+        Dataset arrays are not copied: each dataset is stored with a
+        reference to the ``arr`` (and ``raw``) it had at snapshot time.
         This relies on transforms and data edits assigning a new array to
         ``ds.arr`` instead of modifying it in place.  Fit-layer arrays are
         likewise kept by reference, since they are never modified.
         """
+        datasets = list(self.datasets)
+        for dw in self.dataset_widgets:
+            if not any(dw.dataset is ds for ds in datasets):
+                datasets.append(dw.dataset)
         series = []
-        for i, dw in enumerate(self.dataset_widgets):
-            if dw._rb_hist2d.isChecked():
-                mode = "hist2d"
-            elif dw._rb_hist.isChecked():
-                mode = "histogram"
-            else:
-                mode = "series"
+        for dw in self.dataset_widgets:
             series.append({
                 "dataset":      dw.dataset,
-                "arr":          dw.dataset.arr,
-                "tab_name":     self.datasets_tab.tabText(i),
-                "mode":         mode,
+                # tab bar may already be reordered during a tab drag
+                "tab_name":     self.datasets_tab.tabText(self.datasets_tab.indexOf(dw)),
+                "mode":         dw.mode(),
                 "visible":      dw.visible.isChecked(),
                 "columns": {
                     "xcol":  dw.xcol.value(),  "ycol":  dw.ycol.value(),
@@ -1328,10 +1452,13 @@ class MainWindow(QMainWindow):
                 "hist2d_style": copy.deepcopy(dw._hist2d_style),
                 "last_fit_cfg": copy.deepcopy(getattr(dw, "_last_fit_cfg", None)),
             })
+        current = self.datasets_tab.currentWidget()
         return {
             "datasets":       list(self.datasets),
+            "data":           snapshot_datasets(datasets),
             "series":         series,
-            "current_tab":    self.datasets_tab.currentIndex(),
+            "current_tab":    (self.dataset_widgets.index(current)
+                               if current in self.dataset_widgets else -1),
             "axis_settings":  self._get_axis_settings(),
             "style_settings": copy.deepcopy(self.style_settings),
             "annotations":    copy.deepcopy(self._annotations),
@@ -1360,16 +1487,20 @@ class MainWindow(QMainWindow):
                 self.datasets_tab.removeTab(0)
                 w.deleteLater()
             self.datasets = list(snap["datasets"])
+            # before widget creation: column counts drive spinbox ranges
+            restore_datasets(snap["data"])
             for s in snap["series"]:
                 ds = s["dataset"]
-                ds.arr = s["arr"]     # before widget creation: sets spinbox ranges
                 dw = self._add_dataset_widget(ds)
+                dw.refresh_col_ranges()
                 self.datasets_tab.setTabText(self.datasets_tab.count() - 1,
                                              s["tab_name"])
                 cols = s["columns"]
                 for name in ("xcol", "ycol", "dxcol", "dycol", "dy_low_col",
                              "dy_high_col", "hcol", "xcol2", "ycol2"):
-                    getattr(dw, name).setValue(cols[name])
+                    optional = name in ("dxcol", "dycol", "dy_low_col", "dy_high_col")
+                    getattr(dw, name).setValue(
+                        clamp_column(cols[name], ds.ncols, optional))
                 dw.set_mode(s["mode"])
                 dw.visible.setChecked(s["visible"])
                 for key, style in (("series_style", dw._series_style),
@@ -1384,6 +1515,7 @@ class MainWindow(QMainWindow):
 
             # global settings
             self._apply_axis_settings(snap["axis_settings"])
+            self._last_axis_settings = dict(snap["axis_settings"])
             self.style_settings = copy.deepcopy(snap["style_settings"])
             self._annotations   = copy.deepcopy(snap["annotations"])
             self._legend_pos    = snap["legend_pos"]
@@ -1416,6 +1548,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Warning: could not apply theme '{theme}': {e}", file=sys.stderr)
 
+        self._last_axis_settings = self._get_axis_settings()
         self.fig.clear()
         ax = self.fig.add_subplot(111)
 

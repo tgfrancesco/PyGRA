@@ -78,3 +78,59 @@ class History:
         """Drop all undo and redo snapshots."""
         self._undo.clear()
         self._redo.clear()
+
+
+def snapshot_datasets(datasets) -> list:
+    """
+    Capture the contents of each dataset by reference.
+
+    Parameters
+    ----------
+    datasets : iterable of DataSet
+        Datasets whose current ``arr`` (and ``raw``, if present) should be
+        recorded.
+
+    Returns
+    -------
+    list of tuple
+        ``(dataset, arr, raw)`` per dataset; *raw* is ``None`` when the
+        dataset has no ``raw`` attribute.  Arrays are not copied: this
+        relies on transforms and edits assigning a new array to
+        ``ds.arr`` instead of modifying it in place.
+    """
+    return [(ds, ds.arr, getattr(ds, "raw", None)) for ds in datasets]
+
+
+def restore_datasets(entries) -> None:
+    """Put back the ``arr``/``raw`` captured by :func:`snapshot_datasets`."""
+    for ds, arr, raw in entries:
+        ds.arr = arr
+        if raw is not None:
+            ds.raw = raw
+
+
+def clamp_column(value: int, ncols: int, optional: bool) -> int:
+    """
+    Clamp a column index to the columns of a dataset.
+
+    Parameters
+    ----------
+    value : int
+        Column index, or ``-1`` for "none".
+    ncols : int
+        Number of columns available.
+    optional : bool
+        If ``True`` an out-of-range index becomes ``-1`` ("none");
+        otherwise it is clamped to the last column (or ``-1`` when the
+        dataset has no columns).
+
+    Returns
+    -------
+    int
+        A valid column index or ``-1``.
+    """
+    if value < 0:
+        return -1
+    if value < ncols:
+        return value
+    return -1 if optional else ncols - 1

@@ -99,3 +99,85 @@ def test_clear():
     h.clear()
     assert not h.can_undo()
     assert not h.can_redo()
+
+
+# ---------------------------------------------------------------------------
+# Dataset contents in snapshots
+# ---------------------------------------------------------------------------
+
+import numpy as np
+import pytest
+
+from pygra.dataset import DataSet, apply_transform
+from pygra.history import snapshot_datasets, restore_datasets, clamp_column
+
+
+def _make_dataset(arr):
+    ds = DataSet.__new__(DataSet)
+    ds.path = ds.name = "<test>"
+    ds.arr = np.asarray(arr, dtype=float)
+    ds.raw = ds.arr.tolist()
+    ds.skipped_rows = []
+    return ds
+
+
+@pytest.mark.parametrize("new_col", [True, False])
+def test_transform_then_restore_gives_original_array(new_col):
+    ds = _make_dataset([[1, 2], [3, 4], [5, 6]])
+    original = ds.arr.copy()
+    original_arr = ds.arr
+    snap = snapshot_datasets([ds])
+
+    apply_transform(ds, {"col": 1, "op": "multiply by constant",
+                         "val": 10.0, "new_col": new_col})
+    assert ds.arr is not original_arr                  # replaced, not in place
+    np.testing.assert_array_equal(original_arr, original)
+    assert ds.ncols == (3 if new_col else 2)
+
+    restore_datasets(snap)
+    assert ds.arr is original_arr
+    np.testing.assert_array_equal(ds.arr, original)
+    assert ds.ncols == 2
+
+
+@pytest.mark.parametrize("new_col", [True, False])
+def test_restore_then_redo_round_trip(new_col):
+    ds = _make_dataset([[1, 2], [3, 4]])
+    before = snapshot_datasets([ds])
+    apply_transform(ds, {"col": 0, "op": "add constant",
+                         "val": 1.0, "new_col": new_col})
+    after = snapshot_datasets([ds])
+    transformed = ds.arr.copy()
+
+    restore_datasets(before)
+    np.testing.assert_array_equal(ds.arr, [[1, 2], [3, 4]])
+    restore_datasets(after)
+    np.testing.assert_array_equal(ds.arr, transformed)
+
+
+def test_restore_puts_back_raw():
+    ds = _make_dataset([[1, 2]])
+    raw = ds.raw
+    snap = snapshot_datasets([ds])
+    ds.arr = np.array([[9.0, 9.0]])
+    ds.raw = [[9.0, 9.0]]
+    restore_datasets(snap)
+    assert ds.raw is raw
+
+
+def test_restore_without_raw_attribute():
+    ds = _make_dataset([[1, 2]])
+    del ds.raw
+    snap = snapshot_datasets([ds])
+    ds.arr = np.zeros((1, 3))
+    restore_datasets(snap)
+    assert ds.arr.shape == (1, 2)
+    assert not hasattr(ds, "raw")
+
+
+def test_clamp_column():
+    assert clamp_column(1, 3, optional=False) == 1
+    assert clamp_column(2, 2, optional=False) == 1
+    assert clamp_column(2, 2, optional=True) == -1
+    assert clamp_column(-1, 2, optional=False) == -1
+    assert clamp_column(0, 0, optional=False) == -1
